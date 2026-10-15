@@ -16,7 +16,9 @@ name: Deploy
 #
 # Optional repo variable:
 #   DEPLOY_PATH            default /var/www/lets-all-paints
-#   APP_PORT               default 3010
+#
+# DNS A records for letsallpaint.com and www.letsallpaint.com → DEPLOY_HOST.
+# Ports 80 and 443 must be free. Nginx in Docker terminates TLS and proxies to the app.
 #
 # ---------------------------------------------------------------------------
 # CREATE ONCE ON THE SERVER (GitHub never overwrites .env)
@@ -25,6 +27,7 @@ name: Deploy
 #   Docker + Compose
 #   Required keys: POSTGRES_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD,
 #                  ADMIN_SESSION_SECRET, PUBLIC_SITE_URL
+#   PUBLIC_SITE_URL is forced to https://letsallpaint.com by the production compose file.
 # ---------------------------------------------------------------------------
 
 on:
@@ -129,7 +132,6 @@ jobs:
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/lets-all-paints' }}
-      APP_PORT: ${{ vars.APP_PORT || '3010' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -139,9 +141,10 @@ jobs:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
           TAG: ${{ needs.build-and-push.outputs.tag }}
         run: |
-          mkdir -p deploy-artifacts
+          mkdir -p deploy-artifacts/nginx
           sed "s|IMAGE_PLACEHOLDER|${IMAGE}:${TAG}|g" \
             deploy/docker-compose.prod.yml > deploy-artifacts/docker-compose.yml
+          cp deploy/nginx/default.conf deploy/nginx/init-cert.sh deploy-artifacts/nginx/
           echo "Deploying ${IMAGE}:${TAG}"
 
       - name: Ensure deploy directory exists
@@ -163,7 +166,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           port: ${{ env.DEPLOY_SSH_PORT }}
-          source: deploy-artifacts/docker-compose.yml
+          source: deploy-artifacts/docker-compose.yml,deploy-artifacts/nginx/default.conf,deploy-artifacts/nginx/init-cert.sh
           target: ${{ env.DEPLOY_PATH }}
           strip_components: 1
 
@@ -182,7 +185,6 @@ jobs:
           script: |
             set -euo pipefail
             DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
-            APP_PORT="${{ env.APP_PORT }}"
             cd "$DEPLOY_PATH"
 
             if [ ! -f .env ]; then
@@ -203,14 +205,8 @@ jobs:
               exit 1
             fi
 
-            if ! grep -q '^APP_PORT=' .env 2>/dev/null; then
-              echo "APP_PORT=${APP_PORT}" >> .env
-            fi
-
             LOGIN_USER="${GHCR_USERNAME:-${{ github.actor }}}"
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$LOGIN_USER" --password-stdin
-
-            docker image prune -af || true
 
             pull_ok=0
             for attempt in 1 2 3; do
@@ -228,18 +224,75 @@ jobs:
               exit 1
             fi
 
-            docker compose up -d --remove-orphans
+            if ! docker compose up -d --remove-orphans; then
+              echo "ERROR: compose up failed. Listeners on ports 80 and 443:"
+              ss -tlnp | grep -E ':80 |:443 ' || true
+              docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+              exit 1
+            fi
             docker image prune -f
 
-            echo "Waiting for health check on :${APP_PORT}..."
+            echo "Waiting for the app..."
+            app_ok=0
             for i in $(seq 1 45); do
-              if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" >/dev/null 2>&1; then
-                echo "Deploy healthy."
+              if docker compose exec -T web node -e "fetch('http://127.0.0.1:3010/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                app_ok=1
+                break
+              fi
+              sleep 2
+            done
+            if [ "$app_ok" -ne 1 ]; then
+              echo "Health check failed after deploy."
+              docker compose ps
+              docker compose logs --tail=200 web
+              exit 1
+            fi
+
+            env_value() {
+              grep -E "^[[:space:]]*$1=" .env | head -1 | cut -d= -f2- | sed 's/^["'\'']//; s/["'\'']$//' | tr -d '\r'
+            }
+            EMAIL="$(env_value LETSENCRYPT_EMAIL)"
+            if [ -z "$EMAIL" ]; then
+              EMAIL="$(env_value ADMIN_EMAIL)"
+            fi
+
+            issue_cert() {
+              docker compose run --rm --no-deps --entrypoint certbot certbot certonly \
+                --webroot -w /var/www/certbot \
+                --cert-name letsallpaint.com \
+                "$@" \
+                --email "$EMAIL" \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive \
+                --keep-until-expiring
+            }
+
+            if ! issue_cert -d letsallpaint.com -d www.letsallpaint.com; then
+              echo "Certificate including www failed. Requesting letsallpaint.com only."
+              issue_cert -d letsallpaint.com
+            fi
+
+            docker compose run --rm --no-deps --entrypoint sh certs -c '
+              cp -L /etc/letsencrypt/live/letsallpaint.com/fullchain.pem /etc/nginx/ssl/fullchain.pem
+              cp -L /etc/letsencrypt/live/letsallpaint.com/privkey.pem /etc/nginx/ssl/privkey.pem
+              chmod 644 /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/privkey.pem
+            '
+            docker compose exec -T nginx nginx -s reload
+            docker compose --profile renew up -d certbot
+
+            if ! command -v curl >/dev/null 2>&1; then
+              apt-get update && apt-get install -y curl
+            fi
+
+            echo "Waiting for HTTPS..."
+            for i in $(seq 1 15); do
+              if curl -fsS --resolve letsallpaint.com:443:127.0.0.1 https://letsallpaint.com/api/health >/dev/null 2>&1; then
+                echo "Deploy healthy at https://letsallpaint.com"
                 exit 0
               fi
               sleep 2
             done
-            echo "Health check failed after deploy."
-            docker compose ps
-            docker compose logs --tail=200 web
+            echo "HTTPS health check failed."
+            docker compose logs --tail=100 nginx
             exit 1

@@ -58,6 +58,243 @@ body {
     linear-gradient(160deg, #75294d 0%, #4d1832 100%);
 }
 
+/* Landing — layout inspired by editorial charity reference; brand colours stay local */
+.landing-wash {
+  background:
+    radial-gradient(ellipse 55% 50% at 18% 42%, color-mix(in srgb, var(--color-pink) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 40% 35% at 78% 18%, color-mix(in srgb, var(--color-gold) 18%, transparent), transparent 65%);
+}
+
+.landing-wash-soft {
+  opacity: 0.7;
+}
+
+.landing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.75rem 1.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.landing-btn:hover {
+  transform: translateY(-1px);
+}
+
+.landing-btn-ink {
+  background: var(--color-ink);
+  color: white;
+}
+
+.landing-btn-ink:hover {
+  background: color-mix(in srgb, var(--color-ink) 88%, white);
+}
+
+.landing-btn-gold {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+
+.landing-btn-gold:hover {
+  background: color-mix(in srgb, var(--color-gold) 85%, white);
+}
+
+.landing-slash-stack {
+  position: relative;
+  height: min(28rem, 72vw);
+  margin-inline: auto;
+  transform: rotate(-18deg);
+}
+
+.landing-slash {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 22%;
+  overflow: hidden;
+  border-radius: 999px;
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--color-burgundy) 18%, transparent);
+  top: calc(6% + var(--i) * 23%);
+  animation: landing-slash-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.12s + var(--i) * 0.08s);
+}
+
+.landing-slash-img {
+  position: absolute;
+  inset: -40% -10%;
+  width: 120%;
+  height: 180%;
+  max-width: none;
+  object-fit: cover;
+  transform: rotate(18deg) scale(1.05);
+}
+
+.landing-dot {
+  position: absolute;
+  border-radius: 999px;
+  animation: landing-float 5.5s ease-in-out infinite;
+}
+
+.landing-dot-a {
+  top: 8%;
+  right: 4%;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--color-gold);
+}
+
+.landing-dot-b {
+  top: 42%;
+  left: -2%;
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--color-burgundy);
+  animation-delay: -1.5s;
+}
+
+.landing-dot-c {
+  bottom: 12%;
+  right: 10%;
+  width: 0.85rem;
+  height: 0.85rem;
+  background: var(--color-pink);
+  animation-delay: -3s;
+}
+
+.landing-dot-d {
+  top: 12%;
+  right: 8%;
+  width: 0.65rem;
+  height: 0.65rem;
+  background: var(--color-gold);
+}
+
+.landing-dot-e {
+  bottom: -0.4rem;
+  left: -0.4rem;
+  width: 1rem;
+  height: 1rem;
+  background: var(--color-burgundy);
+}
+
+.landing-card-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, transparent 40%, color-mix(in srgb, var(--color-ink) 35%, transparent));
+}
+
+.landing-card-media-burgundy {
+  background: color-mix(in srgb, var(--color-burgundy) 35%, white);
+}
+
+.landing-card-media-gold {
+  background: color-mix(in srgb, var(--color-gold) 40%, white);
+}
+
+.landing-card-media-pink {
+  background: color-mix(in srgb, var(--color-pink) 45%, white);
+}
+
+.landing-circles {
+  isolation: isolate;
+}
+
+.landing-circle {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 4px solid white;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--color-burgundy) 14%, transparent);
+}
+
+.landing-circle-main {
+  inset: 12% 18% 18% 12%;
+  z-index: 1;
+}
+
+.landing-circle-a {
+  width: 38%;
+  aspect-ratio: 1;
+  top: 0;
+  right: 2%;
+  z-index: 2;
+}
+
+.landing-circle-b {
+  width: 28%;
+  aspect-ratio: 1;
+  bottom: 4%;
+  left: 0;
+  z-index: 2;
+}
+
+.landing-icon {
+  display: inline-flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-burgundy) 8%, white);
+  color: var(--color-burgundy);
+  font-size: 1rem;
+}
+
+.landing-fade-up {
+  animation: landing-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-fade-up-delay {
+  animation: landing-rise 0.95s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-slash-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade-up,
+  .landing-fade-up-delay,
+  .landing-slash,
+  .landing-dot {
+    animation: none !important;
+  }
+}
+
 @media print {
   header,
   footer,

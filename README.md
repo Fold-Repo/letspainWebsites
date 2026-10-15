@@ -49,9 +49,9 @@ cp .env.example /var/www/lets-all-paints/.env
 # fill POSTGRES_PASSWORD, admin, Stripe, SMTP, and PUBLIC_SITE_URL
 ```
 
-GitHub never overwrites that `.env`. The site listens on port 3010. Postgres is only reachable inside Docker, and its data stays in the `paints-pg` volume.
+GitHub never overwrites that `.env`. Set `PUBLIC_SITE_URL=https://letsallpaint.com`. Nginx in Docker listens on ports 80 and 443, gets a Let's Encrypt certificate, and proxies to the app. Point the DNS A records for `letsallpaint.com` and `www.letsallpaint.com` at the server before the first deploy. Postgres stays in the `paints-pg` volume.
 
-Repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (or `DEPLOY_SSH_PASSWORD`), `GHCR_TOKEN`, `GHCR_USERNAME`. Optional variables: `DEPLOY_PATH`, `APP_PORT`.
+Repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (or `DEPLOY_SSH_PASSWORD`), `GHCR_TOKEN`, `GHCR_USERNAME`. Optional variable: `DEPLOY_PATH`.
 
 To build on the server instead of using the pipeline:
 
