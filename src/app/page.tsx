@@ -4,24 +4,42 @@ import { getFeaturedEvent, storyParagraphs } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Optimized WebP stock photos (Unsplash / Pexels, free license).
+ * Replace with original hangout photography when available.
+ */
+const photos = {
+  hero: "/landing-hero.webp",
+  create: "/landing-card1.webp",
+  connect: "/landing-card2.webp",
+  celebrate: "/landing-card3.webp",
+  circle: "/landing-circle.webp",
+  circleA: "/landing-circle-a.webp",
+  circleB: "/landing-circle-b.webp",
+  portrait: "/landing-portrait.webp",
+} as const;
+
 const programs = [
   {
     title: "Create",
     copy: "Paint together, with a guide and materials waiting on the table.",
     href: "/book",
     tone: "burgundy" as const,
+    image: photos.create,
   },
   {
     title: "Connect",
     copy: "Make memories with family, friends or someone you have been meaning to see.",
     href: "/about",
     tone: "gold" as const,
+    image: photos.connect,
   },
   {
     title: "Celebrate",
     copy: "Good food, drinks, and a canvas you actually made.",
     href: "/events",
     tone: "pink" as const,
+    image: photos.celebrate,
   },
 ];
 
@@ -40,7 +58,6 @@ export default async function HomePage() {
 
   return (
     <div className="landing bg-white text-ink">
-      {/* Hero — brand + one line + CTA + diagonal image plane */}
       <section className="landing-hero relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 landing-wash" aria-hidden />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pt-10 pb-16 md:grid-cols-[1.05fr_0.95fr] md:pt-16 md:pb-24">
@@ -55,10 +72,10 @@ export default async function HomePage() {
               {featured?.tagline || "A creative day for everyone."}
             </p>
             <p className="mt-4 max-w-md text-base leading-relaxed text-ink/70">
-              Creative moments. Great company. Lasting memories. A painting hangout for families,
-              friends and anyone who wants a canvas at the end of the day.
+              Creative moments. Great company. Lasting memories — a painting hangout for families and
+              friends.
             </p>
-            <div className="mt-8">
+            <div className="mt-7">
               <Link href="/book" className="landing-btn landing-btn-ink">
                 Enrol
                 <span aria-hidden>→</span>
@@ -70,27 +87,23 @@ export default async function HomePage() {
             <span className="landing-dot landing-dot-a" aria-hidden />
             <span className="landing-dot landing-dot-b" aria-hidden />
             <span className="landing-dot landing-dot-c" aria-hidden />
-            <div className="landing-slash-stack" aria-hidden={false}>
-              {[0, 1, 2, 3].map((index) => (
-                <div key={index} className="landing-slash" style={{ ["--i" as string]: index }}>
-                  <Image
-                    src="/logo.jpg"
-                    alt=""
-                    width={900}
-                    height={900}
-                    priority={index === 0}
-                    className="landing-slash-img"
-                    style={{ objectPosition: `${12 + index * 18}% center` }}
-                  />
-                </div>
-              ))}
+            <div className="landing-slash-frame">
+              <div className="landing-slash-art">
+                <Image
+                  src={photos.hero}
+                  alt="Paintbrushes loaded with bright colour on a studio table"
+                  width={1000}
+                  height={1000}
+                  priority
+                  sizes="(max-width: 768px) 90vw, 420px"
+                  className="h-full w-full object-cover"
+                />
+              </div>
             </div>
-            <span className="sr-only">Let&apos;s All Paints brand mark</span>
           </div>
         </div>
       </section>
 
-      {/* Three pillars */}
       <section className="border-t border-burgundy/8 bg-[#fbf8f4]">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <div className="mx-auto max-w-2xl text-center">
@@ -110,11 +123,12 @@ export default async function HomePage() {
                   className={`landing-card-media landing-card-media-${program.tone} relative aspect-[4/3] overflow-hidden`}
                 >
                   <Image
-                    src="/logo.jpg"
+                    src={program.image}
                     alt=""
-                    width={640}
-                    height={480}
-                    className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-105"
+                    width={900}
+                    height={600}
+                    sizes="(max-width: 768px) 90vw, 320px"
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                 </div>
                 <div className="flex flex-1 flex-col px-5 pt-5 pb-6">
@@ -130,7 +144,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Centered welcome */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 landing-wash landing-wash-soft" aria-hidden />
         <div className="relative mx-auto max-w-3xl px-5 py-20 text-center md:py-24">
@@ -154,19 +167,37 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Hangout feature — circular collage + copy */}
       {featured ? (
         <section className="border-t border-burgundy/8 bg-[#fbf8f4]">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-22">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-20">
             <div className="landing-circles relative mx-auto aspect-square w-full max-w-md">
               <div className="landing-circle landing-circle-main">
-                <Image src="/logo.jpg" alt="" width={520} height={520} className="h-full w-full object-cover" />
+                <Image
+                  src={photos.circle}
+                  alt="Canvas, brushes and palette ready for Eat, Drink & Paint"
+                  width={1000}
+                  height={760}
+                  sizes="(max-width: 768px) 80vw, 360px"
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div className="landing-circle landing-circle-a">
-                <Image src="/logo.jpg" alt="" width={200} height={200} className="h-full w-full object-cover object-[30%_40%]" />
+                <Image
+                  src={photos.circleA}
+                  alt=""
+                  width={600}
+                  height={400}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div className="landing-circle landing-circle-b">
-                <Image src="/logo.jpg" alt="" width={160} height={160} className="h-full w-full object-cover object-[70%_60%]" />
+                <Image
+                  src={photos.circleB}
+                  alt=""
+                  width={500}
+                  height={333}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <span className="landing-dot landing-dot-d" aria-hidden />
             </div>
@@ -193,8 +224,7 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* Inclusions + large visual */}
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-[1fr_0.95fr] md:py-22">
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-[1fr_0.95fr] md:py-20">
         <div>
           <h2 className="font-display text-4xl leading-tight tracking-tight md:text-5xl">
             Leave with a day worth remembering.
@@ -223,10 +253,11 @@ export default async function HomePage() {
         <div className="landing-portrait relative">
           <div className="overflow-hidden rounded-[2rem] shadow-[0_28px_60px_rgba(117,41,77,0.18)]">
             <Image
-              src="/logo.jpg"
-              alt="Let's All Paints"
-              width={800}
-              height={1000}
+              src={photos.portrait}
+              alt="Colourful abstract painting on canvas"
+              width={900}
+              height={1120}
+              sizes="(max-width: 768px) 90vw, 420px"
               className="aspect-[4/5] w-full object-cover"
             />
           </div>

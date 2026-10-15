@@ -104,34 +104,30 @@ body {
   background: color-mix(in srgb, var(--color-gold) 85%, white);
 }
 
-.landing-slash-stack {
+.landing-slash-frame {
   position: relative;
-  height: min(28rem, 72vw);
   margin-inline: auto;
-  transform: rotate(-18deg);
+  width: min(100%, 26rem);
+  aspect-ratio: 1;
+  animation: landing-slash-in 0.95s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.landing-slash {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 22%;
+.landing-slash-art {
+  height: 100%;
+  width: 100%;
   overflow: hidden;
-  border-radius: 999px;
-  box-shadow: 0 14px 36px color-mix(in srgb, var(--color-burgundy) 18%, transparent);
-  top: calc(6% + var(--i) * 23%);
-  animation: landing-slash-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(0.12s + var(--i) * 0.08s);
+  background: color-mix(in srgb, var(--color-burgundy) 10%, white);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='rotate(-18 50 50)'%3E%3Crect x='6' y='6' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='30' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='54' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='78' width='88' height='16' rx='8' fill='white'/%3E%3C/g%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='rotate(-18 50 50)'%3E%3Crect x='6' y='6' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='30' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='54' width='88' height='16' rx='8' fill='white'/%3E%3Crect x='6' y='78' width='88' height='16' rx='8' fill='white'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  filter: drop-shadow(0 18px 28px color-mix(in srgb, var(--color-burgundy) 28%, transparent));
 }
 
-.landing-slash-img {
-  position: absolute;
-  inset: -40% -10%;
-  width: 120%;
-  height: 180%;
-  max-width: none;
-  object-fit: cover;
-  transform: rotate(18deg) scale(1.05);
+.landing-slash-art img {
+  transform: scale(1.06);
 }
 
 .landing-dot {

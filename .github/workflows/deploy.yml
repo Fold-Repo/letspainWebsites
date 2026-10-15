@@ -18,7 +18,8 @@ name: Deploy
 #   DEPLOY_PATH            default /var/www/lets-all-paints
 #
 # DNS A records for letsallpaint.com and www.letsallpaint.com → DEPLOY_HOST.
-# Ports 80 and 443 must be free. Nginx in Docker terminates TLS and proxies to the app.
+# The VPS already runs host nginx on 80/443. The app listens on 127.0.0.1:3020.
+# Deploy installs a host nginx site and a Let's Encrypt certificate.
 #
 # ---------------------------------------------------------------------------
 # CREATE ONCE ON THE SERVER (GitHub never overwrites .env)
@@ -144,7 +145,7 @@ jobs:
           mkdir -p deploy-artifacts/nginx
           sed "s|IMAGE_PLACEHOLDER|${IMAGE}:${TAG}|g" \
             deploy/docker-compose.prod.yml > deploy-artifacts/docker-compose.yml
-          cp deploy/nginx/default.conf deploy/nginx/init-cert.sh deploy-artifacts/nginx/
+          cp deploy/nginx/letsallpaint.com.conf deploy/nginx/letsallpaint.com.http.conf deploy-artifacts/nginx/
           echo "Deploying ${IMAGE}:${TAG}"
 
       - name: Ensure deploy directory exists
@@ -166,7 +167,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           port: ${{ env.DEPLOY_SSH_PORT }}
-          source: deploy-artifacts/docker-compose.yml,deploy-artifacts/nginx/default.conf,deploy-artifacts/nginx/init-cert.sh
+          source: deploy-artifacts/docker-compose.yml,deploy-artifacts/nginx/letsallpaint.com.conf,deploy-artifacts/nginx/letsallpaint.com.http.conf
           target: ${{ env.DEPLOY_PATH }}
           strip_components: 1
 
@@ -225,17 +226,21 @@ jobs:
             fi
 
             if ! docker compose up -d --remove-orphans; then
-              echo "ERROR: compose up failed. Listeners on ports 80 and 443:"
-              ss -tlnp | grep -E ':80 |:443 ' || true
+              echo "ERROR: compose up failed."
+              ss -tlnp | grep ':3020' || true
               docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
               exit 1
             fi
             docker image prune -f
 
-            echo "Waiting for the app..."
+            if ! command -v curl >/dev/null 2>&1; then
+              apt-get update && apt-get install -y curl
+            fi
+
+            echo "Waiting for the app on 127.0.0.1:3020..."
             app_ok=0
             for i in $(seq 1 45); do
-              if docker compose exec -T web node -e "fetch('http://127.0.0.1:3010/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              if curl -fsS http://127.0.0.1:3020/api/health >/dev/null 2>&1; then
                 app_ok=1
                 break
               fi
@@ -248,6 +253,18 @@ jobs:
               exit 1
             fi
 
+            install_site() {
+              src="$1"
+              if [ -d /etc/nginx/sites-available ]; then
+                cp "$src" /etc/nginx/sites-available/letsallpaint.com
+                ln -sf /etc/nginx/sites-available/letsallpaint.com /etc/nginx/sites-enabled/letsallpaint.com
+              else
+                cp "$src" /etc/nginx/conf.d/letsallpaint.com.conf
+              fi
+              nginx -t
+              systemctl reload nginx
+            }
+
             env_value() {
               grep -E "^[[:space:]]*$1=" .env | head -1 | cut -d= -f2- | sed 's/^["'\'']//; s/["'\'']$//' | tr -d '\r'
             }
@@ -256,34 +273,27 @@ jobs:
               EMAIL="$(env_value ADMIN_EMAIL)"
             fi
 
-            issue_cert() {
-              docker compose run --rm --no-deps --entrypoint certbot certbot certonly \
-                --webroot -w /var/www/certbot \
+            mkdir -p /var/www/certbot
+            if [ ! -f /etc/letsencrypt/live/letsallpaint.com/fullchain.pem ]; then
+              install_site nginx/letsallpaint.com.http.conf
+              if ! command -v certbot >/dev/null 2>&1; then
+                apt-get update && apt-get install -y certbot
+              fi
+              if ! certbot certonly --webroot -w /var/www/certbot \
                 --cert-name letsallpaint.com \
-                "$@" \
-                --email "$EMAIL" \
-                --agree-tos \
-                --no-eff-email \
-                --non-interactive \
-                --keep-until-expiring
-            }
-
-            if ! issue_cert -d letsallpaint.com -d www.letsallpaint.com; then
-              echo "Certificate including www failed. Requesting letsallpaint.com only."
-              issue_cert -d letsallpaint.com
+                -d letsallpaint.com -d www.letsallpaint.com \
+                --email "$EMAIL" --agree-tos --no-eff-email --non-interactive; then
+                echo "Certificate including www failed. Requesting letsallpaint.com only."
+                certbot certonly --webroot -w /var/www/certbot \
+                  --cert-name letsallpaint.com \
+                  -d letsallpaint.com \
+                  --email "$EMAIL" --agree-tos --no-eff-email --non-interactive
+              fi
+            else
+              certbot renew --quiet || true
             fi
 
-            docker compose run --rm --no-deps --entrypoint sh certs -c '
-              cp -L /etc/letsencrypt/live/letsallpaint.com/fullchain.pem /etc/nginx/ssl/fullchain.pem
-              cp -L /etc/letsencrypt/live/letsallpaint.com/privkey.pem /etc/nginx/ssl/privkey.pem
-              chmod 644 /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/privkey.pem
-            '
-            docker compose exec -T nginx nginx -s reload
-            docker compose --profile renew up -d certbot
-
-            if ! command -v curl >/dev/null 2>&1; then
-              apt-get update && apt-get install -y curl
-            fi
+            install_site nginx/letsallpaint.com.conf
 
             echo "Waiting for HTTPS..."
             for i in $(seq 1 15); do
@@ -294,5 +304,5 @@ jobs:
               sleep 2
             done
             echo "HTTPS health check failed."
-            docker compose logs --tail=100 nginx
+            nginx -t || true
             exit 1
