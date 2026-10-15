@@ -119,6 +119,8 @@ export async function seedFeaturedEvent() {
     ON CONFLICT (slug) DO NOTHING`,
     [seedStory, seedInclusions],
   );
+  const { seedDefaultCategories } = await import("./ticket-categories");
+  await seedDefaultCategories("eat-drink-paint");
 }
 
 function lines(value: string) {
@@ -219,9 +221,6 @@ export function parseEventInput(body: unknown, slugOverride?: string): EventInpu
   const isFree = Boolean(source.isFree);
   const paymentTiming = source.paymentTiming === "now" ? "now" : "later";
   const pricePence = isFree ? null : moneyField(source.pricePerPerson, "The price per person", 50_000);
-  if (!isFree && pricePence === null) {
-    throw new EventError("A paid event needs a price per person.", 400);
-  }
   const familyPricePence = isFree ? null : moneyField(source.familyPrice, "The family or group price", 500_000);
   const inclusions = String(source.inclusions ?? "")
     .split("\n")

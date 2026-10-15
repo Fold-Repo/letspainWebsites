@@ -1,0 +1,40 @@
+# Production stack on the VPS.
+# IMAGE_PLACEHOLDER is replaced by the deploy workflow with the GHCR image tag.
+# Postgres stays on the Docker network. The site is published on APP_PORT (default 3010).
+# Create /var/www/lets-all-paints/.env once. GitHub never overwrites it.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paints
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: letsallpaints
+    volumes:
+      - paints-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paints -d letsallpaints"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    image: IMAGE_PLACEHOLDER
+    container_name: lets-all-paints
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3010}:3010"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgres://paints:${POSTGRES_PASSWORD}@db:5432/letsallpaints
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  paints-pg:

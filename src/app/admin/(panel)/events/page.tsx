@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { requirePageCapability } from "@/lib/admin-session";
 import { formatLondon, listEvents } from "@/lib/events";
 import { formatGbp } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminEventsPage() {
+  await requirePageCapability("events");
   let events: Awaited<ReturnType<typeof listEvents>> = [];
   let error = "";
   try {

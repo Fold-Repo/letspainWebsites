@@ -1,22 +1,27 @@
 import type { Booking } from "@/lib/bookings";
 import type { Hangout } from "@/lib/events";
+import type { BookingItem } from "@/lib/ticket-categories";
 import { ticketFacts } from "@/lib/ticket";
 
 export function TicketCard({
   booking,
   hangout,
   qrDataUrl,
+  items = [],
 }: {
   booking: Booking;
   hangout: Hangout;
   qrDataUrl: string;
+  items?: BookingItem[];
 }) {
   const ticket = ticketFacts(booking, hangout);
   return (
-    <article className="ticket" aria-label={`Reservation voucher ${ticket.code}`}>
+    <article className="ticket" aria-label={`Ticket ${ticket.code}`}>
       <div className="ticket-head">
         <p className="text-xs tracking-[0.22em] text-pink uppercase">Let&apos;s All Paints</p>
-        <p className="mt-2 font-display text-3xl text-cream">Reservation voucher</p>
+        <p className="mt-2 font-display text-3xl text-cream">
+          {booking.paymentStatus === "paid" || booking.paymentStatus === "free" ? "Entry ticket" : "Reservation voucher"}
+        </p>
       </div>
       <div className="px-6 pt-6 pb-2">
         <p className="text-xs tracking-[0.18em] text-burgundy uppercase">
@@ -34,7 +39,14 @@ export function TicketCard({
         </div>
         <div className="grid grid-cols-[7rem_1fr] gap-3 py-3">
           <dt className="text-xs tracking-[0.12em] text-burgundy uppercase">Party</dt>
-          <dd className="font-display text-lg">{ticket.party}</dd>
+          <dd className="font-display text-lg">
+            {ticket.party}
+            {items.length > 0 ? (
+              <span className="mt-1 block text-sm font-sans text-ink/70">
+                {items.map((item) => `${item.quantity} × ${item.categoryName}`).join(" · ")}
+              </span>
+            ) : null}
+          </dd>
         </div>
         <div className="grid grid-cols-[7rem_1fr] gap-3 py-3">
           <dt className="text-xs tracking-[0.12em] text-burgundy uppercase">When</dt>

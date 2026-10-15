@@ -1,3 +1,4 @@
+import { requirePageCapability } from "@/lib/admin-session";
 import { categoryLabel, listPartnerships, type Partnership } from "@/lib/partnerships";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ function inboxLabel(enquiry: Partnership) {
 }
 
 export default async function PartnershipsAdminPage() {
+  await requirePageCapability("partnerships");
   let enquiries: Partnership[] = [];
   let error = "";
   try {

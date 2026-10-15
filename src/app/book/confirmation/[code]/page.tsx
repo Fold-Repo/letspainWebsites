@@ -6,6 +6,7 @@ import { TicketCard } from "@/components/TicketCard";
 import { getBooking } from "@/lib/bookings";
 import { getEvent } from "@/lib/events";
 import { supportEmail } from "@/lib/event";
+import { listBookingItems } from "@/lib/ticket-categories";
 import { formatGbp } from "@/lib/money";
 import { confirmCheckoutSession } from "@/lib/stripe";
 import { ticketQrDataUrl } from "@/lib/ticket";
@@ -26,6 +27,7 @@ export default async function ConfirmationPage({
   if (!booking) notFound();
   const hangout = await getEvent(booking.eventSlug);
   if (!hangout) notFound();
+  const items = await listBookingItems(booking.code);
   const qrDataUrl = await ticketQrDataUrl(booking.code);
   const note =
     booking.paymentStatus === "paid"
@@ -42,7 +44,7 @@ export default async function ConfirmationPage({
       <h1 className="mt-3 text-center font-display text-4xl">Your voucher is ready</h1>
       <p className="no-print mt-3 text-center text-ink/75">{note}</p>
       <div className="mt-8">
-        <TicketCard booking={booking} hangout={hangout} qrDataUrl={qrDataUrl} />
+        <TicketCard booking={booking} hangout={hangout} qrDataUrl={qrDataUrl} items={items} />
       </div>
       <div className="no-print mt-6 flex flex-wrap justify-center gap-3 text-sm">
         {booking.checkoutUrl && booking.paymentStatus !== "paid" ? (

@@ -2,9 +2,9 @@
 
 Eat, Drink & Paint reservations for Leicester, May 2027. Next.js serves the site and the API. Postgres stores bookings and the admin account. Docker runs both.
 
-Guests enrol and receive a voucher. Events, prices and enrolment dates are managed at `/admin/events`. The May 2027 Eat, Drink & Paint hangout is created the first time the app starts. Edit its enrolment end date, mark it free or paid, set the price per person, and optionally set a flat family or group price.
+Guests enrol, choose ticket categories, and receive a QR ticket. Events, ticket types, prices and enrolment dates are managed at `/admin/events`. The May 2027 Eat, Drink & Paint hangout is seeded with Adult, Child and Family tickets the first time the app starts.
 
-If an event takes payment straight after enrolment, the guest is sent to Stripe after the form. If payment is later, an admin emails a payment link from the reservations screen. That link can use the standard total, the family or group price, or a custom amount for that party. Stripe takes the card. A webhook marks the enrolment paid and emails a receipt.
+If an event takes payment straight after enrolment, the guest is sent to Stripe Checkout after the form. If payment is later, an admin emails a payment link from the reservations screen (ticket cart total, family price, or custom). Stripe takes the card. A webhook marks the enrolment paid and emails a receipt. Door staff use `/admin/check-in` to look up a code and admit once; a second scan is blocked. Sold-out is shown when capacity is full.
 
 ## Local
 
@@ -39,10 +39,23 @@ Copy the signing secret into `STRIPE_WEBHOOK_SECRET`. Set `SMTP_HOST`, `SMTP_USE
 
 ## Deploy
 
+Pushes to `main` run typecheck and a production build, publish the image to GHCR, then SSH to the server and run `docker compose pull` and `up`. Pull requests run the same typecheck and build.
+
+On the server, once:
+
 ```bash
-cp .env.example .env
-# fill admin, Stripe, SMTP, and PUBLIC_SITE_URL
-docker compose up -d --build
+mkdir -p /var/www/lets-all-paints
+cp .env.example /var/www/lets-all-paints/.env
+# fill POSTGRES_PASSWORD, admin, Stripe, SMTP, and PUBLIC_SITE_URL
 ```
 
-The site listens on port 3010. Postgres data stays in the `paints-pg` volume. Tables are created when the app starts.
+GitHub never overwrites that `.env`. The site listens on port 3010. Postgres is only reachable inside Docker, and its data stays in the `paints-pg` volume.
+
+Repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (or `DEPLOY_SSH_PASSWORD`), `GHCR_TOKEN`, `GHCR_USERNAME`. Optional variables: `DEPLOY_PATH`, `APP_PORT`.
+
+To build on the server instead of using the pipeline:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireCapability } from "@/lib/admin-session";
+import { writeAudit } from "@/lib/audit";
 import { createEvent, EventError, parseEventInput } from "@/lib/events";
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireCapability("events");
   if (!admin) return NextResponse.json({ message: "Sign in again." }, { status: 401 });
   let body: unknown;
   try {
@@ -13,6 +14,13 @@ export async function POST(request: Request) {
   }
   try {
     const hangout = await createEvent(parseEventInput(body));
+    await writeAudit({
+      actorEmail: admin.email,
+      action: "event_create",
+      entityType: "event",
+      entityId: hangout.slug,
+      detail: hangout.name,
+    });
     return NextResponse.json({ slug: hangout.slug });
   } catch (error) {
     if (error instanceof EventError) {

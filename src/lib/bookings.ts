@@ -1,6 +1,16 @@
 import { randomBytes } from "crypto";
+import type { PoolClient } from "pg";
 import { query } from "./db";
 import { enrollmentState, formatLondon, getEvent, type PricingChoice } from "./events";
+import {
+  linesTotal,
+  listCategories,
+  listBookingItems,
+  resolveSelections,
+  parseSelections,
+  type ResolvedTicketLine,
+  TicketError,
+} from "./ticket-categories";
 
 export type Booking = {
   code: string;
@@ -22,6 +32,8 @@ export type Booking = {
   stripeSessionId: string | null;
   checkoutUrl: string | null;
   paidAt: string | null;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
 };
 
 export type BookingInput = {
@@ -37,6 +49,7 @@ export type BookingInput = {
   company: string;
   eventSlug: string;
   familyRate: boolean;
+  tickets: ReturnType<typeof parseSelections>;
 };
 
 type BookingRow = {
@@ -59,6 +72,8 @@ type BookingRow = {
   stripe_session_id: string | null;
   checkout_url: string | null;
   paid_at: Date | null;
+  checked_in_at: Date | null;
+  checked_in_by: string | null;
 };
 
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -101,6 +116,8 @@ export function mapBooking(row: BookingRow): Booking {
     stripeSessionId: row.stripe_session_id,
     checkoutUrl: row.checkout_url,
     paidAt: row.paid_at ? new Date(row.paid_at).toISOString() : null,
+    checkedInAt: row.checked_in_at ? new Date(row.checked_in_at).toISOString() : null,
+    checkedInBy: row.checked_in_by,
   };
 }
 
@@ -135,10 +152,11 @@ export function parseBookingInput(body: unknown): BookingInput {
     company: clean(source.company, 80),
     eventSlug: clean(source.eventSlug, 60).toLowerCase(),
     familyRate: Boolean(source.familyRate),
+    tickets: parseSelections(body),
   };
 }
 
-function validate(input: BookingInput) {
+function validateLead(input: BookingInput) {
   if (input.company) {
     throw new BookingError("We could not save that reservation.", 400);
   }
@@ -154,45 +172,86 @@ function validate(input: BookingInput) {
   if (input.phone && !/^[0-9+().\-\s]{7,30}$/.test(input.phone)) {
     throw new BookingError("Check the phone number, or leave it blank.", 400, "phone");
   }
-  if (!Number.isInteger(input.adults) || input.adults < 1 || input.adults > 8) {
-    throw new BookingError("Choose between 1 and 8 adults.", 400, "adults");
-  }
-  if (!Number.isInteger(input.children) || input.children < 0 || input.children > 8) {
-    throw new BookingError("Choose between 0 and 8 children.", 400, "children");
-  }
   if (!input.termsAccepted) {
     throw new BookingError("Please accept the reservation terms.", 400, "termsAccepted");
   }
 }
 
+async function insertItems(client: PoolClient, code: string, lines: ResolvedTicketLine[]) {
+  for (const line of lines) {
+    await client.query(
+      `INSERT INTO booking_items
+        (booking_code, category_id, category_name, quantity, unit_price_pence, seats)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [code, line.category.id, line.category.name, line.quantity, line.category.pricePence, line.seats],
+    );
+  }
+}
+
 export async function createBooking(input: BookingInput) {
-  validate(input);
+  validateLead(input);
   const { getPool, readyDatabase } = await import("./db");
   await readyDatabase();
-  const client = await getPool().connect();
-  try {
-    const hangout = await getEvent(input.eventSlug);
-    if (!hangout) {
-      throw new BookingError("Choose a hangout that is open for enrolment.", 404, "eventSlug");
+  const hangout = await getEvent(input.eventSlug);
+  if (!hangout) {
+    throw new BookingError("Choose a hangout that is open for enrolment.", 404, "eventSlug");
+  }
+  const window = enrollmentState(hangout);
+  if (window === "upcoming") {
+    throw new BookingError(
+      `Enrolment for ${hangout.name} opens on ${formatLondon(hangout.enrollmentStartsAt)}.`,
+      409,
+      "eventSlug",
+    );
+  }
+  if (window === "closed") {
+    throw new BookingError(
+      `Enrolment for ${hangout.name} closed on ${formatLondon(hangout.enrollmentEndsAt)}.`,
+      409,
+      "eventSlug",
+    );
+  }
+
+  const categories = await listCategories(hangout.slug, true);
+  let adults = input.adults;
+  let children = input.children;
+  let amountPence: number | null = null;
+  let lines: ResolvedTicketLine[] = [];
+  let pricingChoice: PricingChoice = input.familyRate ? "family" : "per_person";
+
+  if (categories.length > 0) {
+    try {
+      lines = resolveSelections(categories, input.tickets);
+    } catch (error) {
+      if (error instanceof TicketError) {
+        throw new BookingError(error.message, error.status, "tickets");
+      }
+      throw error;
     }
-    const window = enrollmentState(hangout);
-    if (window === "upcoming") {
-      throw new BookingError(
-        `Enrolment for ${hangout.name} opens on ${formatLondon(hangout.enrollmentStartsAt)}.`,
-        409,
-        "eventSlug",
-      );
+    const totals = linesTotal(lines);
+    adults = totals.adults;
+    children = totals.children;
+    amountPence = hangout.isFree ? 0 : totals.amountPence;
+    pricingChoice = "per_person";
+  } else {
+    if (!Number.isInteger(input.adults) || input.adults < 1 || input.adults > 8) {
+      throw new BookingError("Choose between 1 and 8 adults.", 400, "adults");
     }
-    if (window === "closed") {
-      throw new BookingError(
-        `Enrolment for ${hangout.name} closed on ${formatLondon(hangout.enrollmentEndsAt)}.`,
-        409,
-        "eventSlug",
-      );
+    if (!Number.isInteger(input.children) || input.children < 0 || input.children > 8) {
+      throw new BookingError("Choose between 0 and 8 children.", 400, "children");
     }
     if (input.familyRate && hangout.familyPricePence == null) {
       throw new BookingError("This hangout does not have a family or group price.", 400, "familyRate");
     }
+  }
+
+  const seats = adults + children;
+  if (seats < 1) {
+    throw new BookingError("Choose at least one place.", 400, "tickets");
+  }
+
+  const client = await getPool().connect();
+  try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [hangout.slug]);
     const existing = await client.query(
@@ -211,38 +270,45 @@ export async function createBooking(input: BookingInput) {
       [hangout.slug],
     );
     const taken = takenResult.rows[0]?.taken ?? 0;
-    const seats = partySize(input);
     const remaining = hangout.capacity - taken;
+    if (remaining <= 0) {
+      throw new BookingError("This hangout is sold out.", 409, "tickets");
+    }
     if (seats > remaining) {
       throw new BookingError(
-        remaining > 0
-          ? `Only ${remaining} ${remaining === 1 ? "place is" : "places are"} left. Reduce the party size or write to us.`
-          : "This hangout is fully reserved.",
+        `Only ${remaining} ${remaining === 1 ? "place is" : "places are"} left. Reduce the ticket quantity.`,
         409,
-        "adults",
+        "tickets",
       );
     }
+    const paymentStatus =
+      hangout.isFree || (amountPence !== null && amountPence === 0 && categories.length > 0) ? "free" : "unpaid";
+    const code = makeCode();
     const inserted = await client.query<BookingRow>(
       `INSERT INTO bookings (
         code, event_slug, first_name, last_name, email, phone, adults, children, notes, marketing_opt_in,
-        pricing_choice, payment_status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        pricing_choice, payment_status, amount_pence
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       RETURNING *`,
       [
-        makeCode(),
+        code,
         hangout.slug,
         input.firstName,
         input.lastName,
         input.email,
         input.phone,
-        input.adults,
-        input.children,
+        adults,
+        children,
         input.notes,
         input.marketingOptIn,
-        input.familyRate ? "family" : "per_person",
-        hangout.isFree ? "free" : "unpaid",
+        pricingChoice,
+        paymentStatus,
+        amountPence,
       ],
     );
+    if (lines.length > 0) {
+      await insertItems(client, code, lines);
+    }
     await client.query("COMMIT");
     return mapBooking(inserted.rows[0]!);
   } catch (error) {
@@ -268,6 +334,14 @@ export async function getBooking(code: string) {
 
 export async function listBookings() {
   const result = await query<BookingRow>("SELECT * FROM bookings ORDER BY created_at DESC");
+  return result.rows.map(mapBooking);
+}
+
+export async function listBookingsForEvent(eventSlug: string) {
+  const result = await query<BookingRow>(
+    "SELECT * FROM bookings WHERE event_slug = $1 ORDER BY created_at DESC",
+    [eventSlug],
+  );
   return result.rows.map(mapBooking);
 }
 
@@ -304,4 +378,35 @@ export async function markBookingPaid(code: string, sessionId: string, amountPen
     [code, sessionId, amountPence],
   );
   return result.rows[0] ? mapBooking(result.rows[0]) : null;
+}
+
+export async function checkInBooking(code: string, adminEmail: string) {
+  const booking = await getBooking(code);
+  if (!booking) {
+    throw new BookingError("That ticket was not found.", 404);
+  }
+  if (booking.paymentStatus !== "paid" && booking.paymentStatus !== "free") {
+    throw new BookingError("This ticket is not paid yet, so it cannot be checked in.", 409);
+  }
+  if (booking.checkedInAt) {
+    throw new BookingError(
+      `Already checked in at ${new Date(booking.checkedInAt).toLocaleString("en-GB")}. Duplicate admission blocked.`,
+      409,
+    );
+  }
+  const result = await query<BookingRow>(
+    `UPDATE bookings
+     SET checked_in_at = NOW(), checked_in_by = $2
+     WHERE code = $1 AND checked_in_at IS NULL AND payment_status IN ('paid', 'free')
+     RETURNING *`,
+    [booking.code, adminEmail],
+  );
+  if (!result.rows[0]) {
+    throw new BookingError("Could not check this ticket in. Refresh and try again.", 409);
+  }
+  return mapBooking(result.rows[0]);
+}
+
+export async function bookingCart(code: string) {
+  return listBookingItems(code);
 }

@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-import { ADMIN_COOKIE, adminCookieOptions, createSessionToken } from "@/lib/admin-session";
-import { query } from "@/lib/db";
+import {
+  ADMIN_COOKIE,
+  MFA_COOKIE,
+  adminCookieOptions,
+  createMfaChallengeToken,
+  createSessionToken,
+  homePathForRole,
+} from "@/lib/admin-session";
+import { getAdminByEmail } from "@/lib/admins";
+import { writeAudit } from "@/lib/audit";
 import { verifyPassword } from "@/lib/password";
 
 const hits = new Map<string, number[]>();
@@ -29,10 +37,25 @@ export async function POST(request: Request) {
   const password = String(body.password ?? "");
   const invalid = NextResponse.json({ message: "That email or password is not right." }, { status: 401 });
   if (!email || password.length < 8) return invalid;
-  const found = await query<{ password_hash: string }>("SELECT password_hash FROM admins WHERE email = $1", [email]);
-  const hash = found.rows[0]?.password_hash;
-  if (!hash || !(await verifyPassword(password, hash))) return invalid;
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(ADMIN_COOKIE, createSessionToken(email), adminCookieOptions());
+  const admin = await getAdminByEmail(email);
+  if (!admin || !(await verifyPassword(password, admin.passwordHash))) return invalid;
+
+  if (admin.mfaEnabled && admin.mfaSecretEnc) {
+    const response = NextResponse.json({ ok: true, mfaRequired: true });
+    response.cookies.set(MFA_COOKIE, createMfaChallengeToken(email), adminCookieOptions(10 * 60));
+    return response;
+  }
+
+  await writeAudit({
+    actorEmail: email,
+    action: "login",
+    entityType: "admin",
+    entityId: email,
+    detail: `role=${admin.role}`,
+  }).catch(() => undefined);
+
+  const response = NextResponse.json({ ok: true, redirect: homePathForRole(admin.role) });
+  response.cookies.set(ADMIN_COOKIE, createSessionToken(email, admin.role), adminCookieOptions());
+  response.cookies.set(MFA_COOKIE, "", { ...adminCookieOptions(0), maxAge: 0 });
   return response;
 }

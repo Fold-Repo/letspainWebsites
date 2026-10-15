@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
-import { getBooking, partySize, savePaymentLink } from "@/lib/bookings";
+import { requireCapability } from "@/lib/admin-session";
+import { writeAudit } from "@/lib/audit";
+import { bookingCart, getBooking, partySize, savePaymentLink } from "@/lib/bookings";
 import { sendPaymentLinkEmail } from "@/lib/email";
 import { EventError, getEvent, quoteCharge, type PricingChoice } from "@/lib/events";
 import { poundsToPence } from "@/lib/money";
 import { createPaymentSession, stripeConfigured } from "@/lib/stripe";
 
 export async function POST(request: Request, context: { params: Promise<{ code: string }> }) {
-  const admin = await requireAdmin();
+  const admin = await requireCapability("payment_links");
   if (!admin) {
     return NextResponse.json({ message: "Sign in again." }, { status: 401 });
   }
@@ -32,11 +33,35 @@ export async function POST(request: Request, context: { params: Promise<{ code: 
   } catch {
     body = {};
   }
-  const mode: PricingChoice =
-    body.mode === "family" || body.mode === "custom" || body.mode === "per_person" ? body.mode : "per_person";
+  const items = await bookingCart(booking.code);
+  const cartTotal = items.reduce((sum, item) => sum + item.unitPricePence * item.quantity, 0);
+  const mode =
+    body.mode === "family" || body.mode === "custom" || body.mode === "per_person" || body.mode === "cart"
+      ? body.mode
+      : items.length > 0
+        ? "cart"
+        : "per_person";
+
   try {
-    const customPence = mode === "custom" ? poundsToPence(String(body.customAmount ?? "")) : null;
-    const charge = quoteCharge(hangout, partySize(booking), mode, customPence);
+    let totalPence = cartTotal;
+    let pricingChoice: PricingChoice = "per_person";
+    let charge = undefined as ReturnType<typeof quoteCharge> | undefined;
+
+    if (mode === "cart") {
+      if (cartTotal < 50) {
+        return NextResponse.json(
+          { message: "This booking has no priced tickets. Enter a custom amount." },
+          { status: 400 },
+        );
+      }
+      totalPence = cartTotal;
+    } else {
+      const customPence = mode === "custom" ? poundsToPence(String(body.customAmount ?? "")) : null;
+      charge = quoteCharge(hangout, partySize(booking), mode, customPence);
+      totalPence = charge.totalPence;
+      pricingChoice = charge.pricingChoice;
+    }
+
     if (!stripeConfigured()) {
       return NextResponse.json(
         { message: "Add STRIPE_SECRET_KEY before sending a payment link." },
@@ -44,14 +69,15 @@ export async function POST(request: Request, context: { params: Promise<{ code: 
       );
     }
     const session = await createPaymentSession(booking, hangout, charge);
-    const updated = await savePaymentLink(
-      booking.code,
-      session.url!,
-      session.id,
-      charge.totalPence,
-      charge.pricingChoice,
-    );
-    const emailed = await sendPaymentLinkEmail(updated ?? { ...booking, amountPence: charge.totalPence }, session.url!);
+    const updated = await savePaymentLink(booking.code, session.url!, session.id, totalPence, pricingChoice);
+    const emailed = await sendPaymentLinkEmail(updated ?? { ...booking, amountPence: totalPence }, session.url!);
+    await writeAudit({
+      actorEmail: admin.email,
+      action: "payment_link",
+      entityType: "booking",
+      entityId: booking.code,
+      detail: `mode=${mode};pence=${totalPence};emailed=${emailed.sent}`,
+    });
     return NextResponse.json({
       url: session.url,
       emailSent: emailed.sent,

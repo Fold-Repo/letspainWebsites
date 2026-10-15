@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatLondon, getEvent, isEnrollmentOpen, storyParagraphs } from "@/lib/events";
 import { formatGbp } from "@/lib/money";
+import { listCategories, remainingSeats } from "@/lib/ticket-categories";
 
 export const dynamic = "force-dynamic";
 
@@ -15,23 +16,26 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: hangout.name, description: hangout.summary };
 }
 
-function priceCopy(hangout: NonNullable<Awaited<ReturnType<typeof getEvent>>>) {
-  if (hangout.isFree) return "Free to attend.";
-  if (hangout.pricePence == null) return "The price has not been published yet. Enrolment does not take payment.";
-  const family = hangout.familyPricePence
-    ? ` A family or group booking can use a set price of ${formatGbp(hangout.familyPricePence)}.`
-    : "";
-  if (hangout.paymentTiming === "now") {
-    return `${formatGbp(hangout.pricePence)} per person. Payment is taken straight after you enrol.${family}`;
-  }
-  return `${formatGbp(hangout.pricePence)} per person. You enrol first. We email a payment link afterwards.${family}`;
-}
-
 export default async function EventPage({ params }: Params) {
   const { slug } = await params;
   const hangout = await getEvent(slug);
   if (!hangout || !hangout.published) notFound();
   const open = isEnrollmentOpen(hangout);
+  const remaining = await remainingSeats(hangout.slug, hangout.capacity);
+  const soldOut = remaining <= 0;
+  const tickets = await listCategories(hangout.slug, true);
+
+  const payCopy = hangout.isFree
+    ? "Free to attend."
+    : tickets.length > 0
+      ? hangout.paymentTiming === "now"
+        ? "Choose a ticket below. Payment is taken securely on Stripe after enrolment."
+        : "Choose a ticket below. You enrol first; we email a Stripe payment link afterwards."
+      : hangout.pricePence == null
+        ? "The price has not been published yet. Enrolment does not take payment."
+        : hangout.paymentTiming === "now"
+          ? `${formatGbp(hangout.pricePence)} per person. Payment is taken straight after you enrol.`
+          : `${formatGbp(hangout.pricePence)} per person. You enrol first. We email a payment link afterwards.`;
 
   return (
     <article className="mx-auto max-w-3xl px-5 py-14">
@@ -45,8 +49,15 @@ export default async function EventPage({ params }: Params) {
         {[
           ["When", `${hangout.whenLabel}. ${hangout.timeLabel}.`],
           ["Where", `${hangout.city}. ${hangout.venue}.`],
-          ["Enrolment", open ? `Open until ${formatLondon(hangout.enrollmentEndsAt)}` : `Closed ${formatLondon(hangout.enrollmentEndsAt)}`],
-          ["What you pay", priceCopy(hangout)],
+          [
+            "Enrolment",
+            soldOut
+              ? "Sold out"
+              : open
+                ? `Open until ${formatLondon(hangout.enrollmentEndsAt)} · ${remaining} places left`
+                : `Closed ${formatLondon(hangout.enrollmentEndsAt)}`,
+          ],
+          ["What you pay", payCopy],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-white p-4">
             <dt className="text-xs tracking-[0.14em] text-burgundy uppercase">{label}</dt>
@@ -54,6 +65,24 @@ export default async function EventPage({ params }: Params) {
           </div>
         ))}
       </dl>
+
+      {tickets.length > 0 ? (
+        <>
+          <h2 className="mt-12 font-display text-3xl">Tickets</h2>
+          <ul className="mt-4 space-y-3">
+            {tickets.map((ticket) => (
+              <li key={ticket.id} className="rounded-2xl border border-burgundy/10 bg-white p-4">
+                <p className="font-display text-2xl">{ticket.name}</p>
+                <p className="mt-1 text-sm text-ink/75">{ticket.description}</p>
+                <p className="mt-2 text-sm">
+                  {ticket.pricePence === 0 ? "Free" : formatGbp(ticket.pricePence)}
+                  {ticket.seatsPerTicket > 1 ? ` · ${ticket.seatsPerTicket} seats` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       <div className="mt-8 space-y-4 leading-relaxed text-ink/80">
         {storyParagraphs(hangout.story).map((paragraph) => (
@@ -72,12 +101,12 @@ export default async function EventPage({ params }: Params) {
         </>
       ) : null}
 
-      {open ? (
+      {open && !soldOut ? (
         <Link href="/book" className="mt-10 inline-block rounded-full bg-burgundy px-5 py-3 text-cream">
           Enrol
         </Link>
       ) : (
-        <p className="mt-10 text-ink/70">Enrolment for this hangout is not open.</p>
+        <p className="mt-10 text-ink/70">{soldOut ? "This hangout is sold out." : "Enrolment for this hangout is not open."}</p>
       )}
     </article>
   );

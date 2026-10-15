@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { markBookingPaid, type Booking } from "./bookings";
+import { bookingCart, markBookingPaid, type Booking } from "./bookings";
 import type { Charge, Hangout } from "./events";
 import { confirmationUrl, partyLabel } from "./ticket";
 
@@ -16,7 +16,39 @@ export function getStripe() {
   return stripe;
 }
 
-export async function createPaymentSession(booking: Booking, hangout: Hangout, charge: Charge) {
+export async function createPaymentSession(booking: Booking, hangout: Hangout, charge?: Charge) {
+  const items = await bookingCart(booking.code);
+  const lineItems =
+    items.length > 0
+      ? items.map((item) => ({
+          quantity: item.quantity,
+          price_data: {
+            currency: "gbp" as const,
+            unit_amount: item.unitPricePence,
+            product_data: {
+              name: `${hangout.name} · ${item.categoryName}`,
+              description: `${item.seats} seat${item.seats === 1 ? "" : "s"} · ${booking.code}`,
+            },
+          },
+        }))
+      : [
+          {
+            quantity: charge?.quantity ?? partySizeFallback(booking),
+            price_data: {
+              currency: "gbp" as const,
+              unit_amount: charge?.unitPence ?? 0,
+              product_data: {
+                name: `${hangout.name} · ${booking.code}`,
+                description: `${charge?.label ?? "Ticket"} · ${partyLabel(booking)} · ${hangout.city} · ${hangout.whenLabel}`,
+              },
+            },
+          },
+        ];
+
+  if (lineItems.some((item) => item.price_data.unit_amount < 1)) {
+    throw new Error("Cannot charge a free ticket through Stripe.");
+  }
+
   const session = await getStripe().checkout.sessions.create({
     mode: "payment",
     customer_email: booking.email,
@@ -25,22 +57,14 @@ export async function createPaymentSession(booking: Booking, hangout: Hangout, c
     expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
     success_url: `${confirmationUrl(booking.code)}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: confirmationUrl(booking.code),
-    line_items: [
-      {
-        quantity: charge.quantity,
-        price_data: {
-          currency: "gbp",
-          unit_amount: charge.unitPence,
-          product_data: {
-            name: `${hangout.name} · ${booking.code}`,
-            description: `${charge.label} · ${partyLabel(booking)} · ${hangout.city} · ${hangout.whenLabel}`,
-          },
-        },
-      },
-    ],
+    line_items: lineItems,
   });
   if (!session.url) throw new Error("Stripe did not return a payment link.");
   return session;
+}
+
+function partySizeFallback(booking: Booking) {
+  return Math.max(1, booking.adults + booking.children);
 }
 
 export async function confirmCheckoutSession(code: string, sessionId: string) {

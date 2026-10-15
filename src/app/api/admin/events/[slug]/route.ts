@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireCapability } from "@/lib/admin-session";
+import { writeAudit } from "@/lib/audit";
 import { EventError, parseEventInput, updateEvent } from "@/lib/events";
 
 export async function PATCH(request: Request, context: { params: Promise<{ slug: string }> }) {
-  const admin = await requireAdmin();
+  const admin = await requireCapability("events");
   if (!admin) return NextResponse.json({ message: "Sign in again." }, { status: 401 });
   const { slug } = await context.params;
   let body: unknown;
@@ -15,6 +16,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   try {
     const hangout = await updateEvent(slug, parseEventInput(body, slug));
     if (!hangout) return NextResponse.json({ message: "That event was not found." }, { status: 404 });
+    await writeAudit({
+      actorEmail: admin.email,
+      action: "event_update",
+      entityType: "event",
+      entityId: hangout.slug,
+      detail: hangout.name,
+    });
     return NextResponse.json({ slug: hangout.slug });
   } catch (error) {
     if (error instanceof EventError) {

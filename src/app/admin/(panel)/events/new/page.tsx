@@ -1,4 +1,5 @@
 import { EventForm, type EventFormValues } from "@/components/EventForm";
+import { requirePageCapability } from "@/lib/admin-session";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,8 @@ const blank: EventFormValues = {
   published: true,
 };
 
-export default function NewEventPage() {
+export default async function NewEventPage() {
+  await requirePageCapability("events");
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
       <p className="text-xs tracking-[0.18em] text-burgundy uppercase">Back office</p>

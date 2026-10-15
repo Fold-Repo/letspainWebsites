@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
-import { BookingError, createBooking, markEmailStatus, parseBookingInput, partySize, savePaymentLink } from "@/lib/bookings";
+import {
+  BookingError,
+  createBooking,
+  markEmailStatus,
+  parseBookingInput,
+  savePaymentLink,
+  bookingCart,
+} from "@/lib/bookings";
 import { sendBookingEmails } from "@/lib/email";
-import { EventError, getEvent, quoteCharge } from "@/lib/events";
+import { getEvent } from "@/lib/events";
+import { listCategories } from "@/lib/ticket-categories";
 import { createPaymentSession, stripeConfigured } from "@/lib/stripe";
 
 const hits = new Map<string, number[]>();
@@ -38,26 +46,30 @@ export async function POST(request: Request) {
     await markEmailStatus(booking.code, emailStatus);
     const hangout = await getEvent(booking.eventSlug);
     let checkoutUrl: string | undefined;
-    if (hangout && !hangout.isFree && hangout.paymentTiming === "now" && hangout.pricePence) {
-      try {
-        const charge = quoteCharge(
-          hangout,
-          partySize(booking),
-          booking.pricingChoice === "family" ? "family" : "per_person",
-        );
-        if (stripeConfigured()) {
-          const session = await createPaymentSession(booking, hangout, charge);
-          await savePaymentLink(booking.code, session.url!, session.id, charge.totalPence, charge.pricingChoice);
-          checkoutUrl = session.url!;
-        }
-      } catch (error) {
-        if (!(error instanceof EventError)) throw error;
-      }
+
+    const shouldPayNow =
+      hangout &&
+      !hangout.isFree &&
+      booking.paymentStatus === "unpaid" &&
+      hangout.paymentTiming === "now" &&
+      (booking.amountPence ?? 0) > 0;
+
+    if (shouldPayNow && stripeConfigured()) {
+      const session = await createPaymentSession(booking, hangout);
+      const amount =
+        booking.amountPence ??
+        (await bookingCart(booking.code)).reduce((sum, item) => sum + item.unitPricePence * item.quantity, 0);
+      await savePaymentLink(booking.code, session.url!, session.id, amount, booking.pricingChoice);
+      checkoutUrl = session.url!;
     }
+
+    const categories = hangout ? await listCategories(hangout.slug, true) : [];
     return NextResponse.json({
       code: booking.code,
       emailSent: email.sent,
       checkoutUrl,
+      soldOut: false,
+      hasTickets: categories.length > 0,
       message: checkoutUrl
         ? "Enrolment saved. Continue to payment."
         : email.sent

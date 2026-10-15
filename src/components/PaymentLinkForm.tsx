@@ -12,6 +12,7 @@ export function PaymentLinkForm({
   familyPricePence,
   seats,
   pricingChoice,
+  cartTotalPence,
 }: {
   code: string;
   paid: boolean;
@@ -20,10 +21,12 @@ export function PaymentLinkForm({
   familyPricePence: number | null;
   seats: number;
   pricingChoice: "per_person" | "family" | "custom";
+  cartTotalPence: number | null;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"per_person" | "family" | "custom">(
-    pricingChoice === "family" && familyPricePence ? "family" : "per_person",
+  const hasCart = cartTotalPence != null && cartTotalPence > 0;
+  const [mode, setMode] = useState<"cart" | "per_person" | "family" | "custom">(
+    hasCart ? "cart" : pricingChoice === "family" && familyPricePence ? "family" : "per_person",
   );
   const [customAmount, setCustomAmount] = useState("");
   const [pending, setPending] = useState(false);
@@ -60,9 +63,18 @@ export function PaymentLinkForm({
   return (
     <form onSubmit={onSubmit} className="space-y-2">
       <p className="text-sm font-medium">Email a payment link</p>
+      {hasCart ? (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="radio" checked={mode === "cart"} onChange={() => setMode("cart")} className="mt-1 accent-burgundy" />
+          <span>Ticket cart total {formatGbp(cartTotalPence!)}</span>
+        </label>
+      ) : null}
       <label className="flex items-start gap-2 text-sm">
         <input type="radio" checked={mode === "per_person"} onChange={() => setMode("per_person")} className="mt-1 accent-burgundy" />
-        <span>Standard total {standard}{pricePence ? ` (${formatGbp(pricePence)} each)` : ""}</span>
+        <span>
+          Standard total {standard}
+          {pricePence ? ` (${formatGbp(pricePence)} each)` : ""}
+        </span>
       </label>
       {familyPricePence ? (
         <label className="flex items-start gap-2 text-sm">

@@ -174,7 +174,8 @@ export function EventForm({ mode, initial }: { mode: "create" | "edit"; initial:
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
             Price per person (£)
-            <input name="pricePerPerson" inputMode="decimal" required defaultValue={initial.pricePerPerson} placeholder="45.00" className="field" />
+            <input name="pricePerPerson" inputMode="decimal" defaultValue={initial.pricePerPerson} placeholder="45.00" className="field" />
+            <span className="mt-1 block text-xs text-ink/60">Optional if you use ticket categories below.</span>
           </label>
           <label className="block text-sm">
             Family or group price (£) <span className="text-ink/50">optional flat amount</span>

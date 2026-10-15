@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { supportEmail } from "@/lib/event";
+import { socialLinks, supportEmail } from "@/lib/event";
 
 export function Footer() {
+  const social = socialLinks();
   return (
     <footer className="border-t border-burgundy/10 bg-ink text-cream">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 md:grid-cols-3">
@@ -31,7 +32,7 @@ export function Footer() {
               <Link href="/partnerships">Partner</Link>
             </li>
             <li>
-              <Link href="/privacy">Privacy</Link>
+              <Link href="/privacy">Privacy &amp; cookies</Link>
             </li>
           </ul>
         </div>
@@ -40,9 +41,26 @@ export function Footer() {
           <a className="mt-3 block text-cream/80" href={`mailto:${supportEmail()}`}>
             {supportEmail()}
           </a>
-          <p className="mt-3 text-cream/60">
-            Instagram and Facebook pages will be added once the brand accounts exist.
-          </p>
+          {social.instagram || social.facebook ? (
+            <ul className="mt-3 space-y-2 text-cream/80">
+              {social.instagram ? (
+                <li>
+                  <a href={social.instagram} rel="noopener noreferrer" target="_blank">
+                    Instagram
+                  </a>
+                </li>
+              ) : null}
+              {social.facebook ? (
+                <li>
+                  <a href={social.facebook} rel="noopener noreferrer" target="_blank">
+                    Facebook
+                  </a>
+                </li>
+              ) : null}
+            </ul>
+          ) : (
+            <p className="mt-3 text-cream/60">Instagram and Facebook pages will be linked here soon.</p>
+          )}
         </div>
       </div>
     </footer>
