@@ -24,7 +24,7 @@ const programs = [
   {
     title: "Create",
     copy: "Paint together, with a guide and materials waiting on the table.",
-    href: "/book",
+    href: "/events",
     tone: "burgundy" as const,
     image: photos.create,
   },
@@ -83,8 +83,8 @@ export default async function HomePage() {
                 See hangouts
                 <span aria-hidden>→</span>
               </Link>
-              <Link href="/book" className="landing-btn border border-burgundy/20 bg-white text-burgundy">
-                Enrol
+              <Link href="/events" className="landing-btn border border-burgundy/20 bg-white text-burgundy">
+                Browse hangouts
               </Link>
             </div>
           </div>
@@ -168,8 +168,8 @@ export default async function HomePage() {
             <Link href="/about" className="landing-btn landing-btn-gold">
               Our story
             </Link>
-            <Link href="/book" className="landing-btn landing-btn-ink">
-              Enrol
+            <Link href="/events" className="landing-btn landing-btn-ink">
+              See hangouts
             </Link>
           </div>
         </div>

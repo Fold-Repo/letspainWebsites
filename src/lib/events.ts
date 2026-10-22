@@ -1,32 +1,26 @@
 import { formatDisplayDate, formatDisplayTime, isValidIsoDate, isValidTime } from "./datetime-input";
 import { query } from "./db";
+import {
+  enrollmentState,
+  eventCoverUrl,
+  formatLondon,
+  hasCustomCover,
+  isEnrollmentOpen,
+  storyParagraphs,
+  type Hangout,
+  type PaymentTiming,
+} from "./hangout";
 import { poundsToPence } from "./money";
 
-export type PaymentTiming = "now" | "later";
+export type { Hangout, PaymentTiming };
 export type PricingChoice = "per_person" | "family" | "custom";
-
-export type Hangout = {
-  slug: string;
-  name: string;
-  tagline: string;
-  summary: string;
-  city: string;
-  venue: string;
-  whenLabel: string;
-  timeLabel: string;
-  story: string;
-  inclusions: string[];
-  capacity: number;
-  enrollmentStartsAt: string;
-  enrollmentEndsAt: string;
-  isFree: boolean;
-  pricePence: number | null;
-  familyPricePence: number | null;
-  paymentTiming: PaymentTiming;
-  published: boolean;
-  imageUrl: string;
-  eventDate: string;
-  eventTime: string;
+export {
+  enrollmentState,
+  eventCoverUrl,
+  formatLondon,
+  hasCustomCover,
+  isEnrollmentOpen,
+  storyParagraphs,
 };
 
 export type EventInput = {
@@ -180,41 +174,6 @@ export function mapEvent(row: EventRow): Hangout {
   };
 }
 
-/** Cover image for cards and detail pages; falls back to a stock placeholder. */
-export function eventCoverUrl(hangout: Pick<Hangout, "imageUrl">) {
-  return hangout.imageUrl || "/landing-hero.webp";
-}
-
-export function hasCustomCover(hangout: Pick<Hangout, "imageUrl">) {
-  return Boolean(hangout.imageUrl);
-}
-
-export function storyParagraphs(story: string) {
-  return story
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-}
-
-export function formatLondon(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Europe/London",
-  }).format(new Date(iso));
-}
-
-export function enrollmentState(hangout: Hangout, now = new Date()) {
-  if (!hangout.published) return "closed" as const;
-  if (now < new Date(hangout.enrollmentStartsAt)) return "upcoming" as const;
-  if (now > new Date(hangout.enrollmentEndsAt)) return "closed" as const;
-  return "open" as const;
-}
-
-export function isEnrollmentOpen(hangout: Hangout, now = new Date()) {
-  return enrollmentState(hangout, now) === "open";
-}
-
 function clean(value: unknown, max: number) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
@@ -331,15 +290,27 @@ export async function getFeaturedEvent(): Promise<Hangout | null> {
   return events.find((hangout) => isEnrollmentOpen(hangout)) ?? events.at(0) ?? null;
 }
 
-/** Published hangouts that are still open or not yet open — for the homepage carousel. */
-export async function listUpcomingEvents() {
+function eventSortKey(hangout: Hangout) {
+  if (hangout.eventDate && isValidIsoDate(hangout.eventDate)) {
+    const time = isValidTime(hangout.eventTime) ? hangout.eventTime : "00:00";
+    return `${hangout.eventDate}T${time}`;
+  }
+  return hangout.enrollmentStartsAt;
+}
+
+/** Next published hangouts for the homepage carousel — soonest first, capped at 5. */
+export async function listUpcomingEvents(limit = 5) {
+  const today = new Date().toISOString().slice(0, 10);
   const events = await listPublishedEvents();
   return events
-    .filter((hangout) => enrollmentState(hangout) !== "closed")
-    .sort(
-      (a, b) =>
-        new Date(a.enrollmentStartsAt).getTime() - new Date(b.enrollmentStartsAt).getTime(),
-    );
+    .filter((hangout) => {
+      if (hangout.eventDate && isValidIsoDate(hangout.eventDate)) {
+        return hangout.eventDate >= today;
+      }
+      return enrollmentState(hangout) !== "closed";
+    })
+    .sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)))
+    .slice(0, Math.max(1, limit));
 }
 
 export async function createEvent(input: EventInput) {

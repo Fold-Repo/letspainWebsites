@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EventCover } from "@/components/EventCover";
-import { enrollmentState, formatLondon, type Hangout } from "@/lib/events";
+import { enrollmentState, formatLondon, type Hangout } from "@/lib/hangout";
 
 function statusCopy(hangout: Hangout) {
   const state = enrollmentState(hangout);

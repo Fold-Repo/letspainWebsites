@@ -20,9 +20,6 @@ export function Footer() {
               <Link href="/events">Hangouts</Link>
             </li>
             <li>
-              <Link href="/book">Enrol</Link>
-            </li>
-            <li>
               <Link href="/about">About</Link>
             </li>
             <li>

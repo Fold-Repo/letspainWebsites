@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { adminRoles, roleLabel, type AdminRole } from "@/lib/roles";
 
-type Created = { email: string; role: AdminRole; mfaEnabled: boolean };
+type Created = { id?: number; email: string; role: AdminRole; mfaEnabled: boolean; protected?: boolean };
 
 export function AdminCreateUserForm({ onCreated }: { onCreated: (admin: Created) => void }) {
   const [email, setEmail] = useState("");

@@ -43,6 +43,20 @@ type DraftCategory = {
   include: boolean;
 };
 
+function localDateKey(value: string) {
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] ?? "";
+}
+
+function sameEnrollmentDay(startsAt: string, endsAt: string) {
+  const start = localDateKey(startsAt);
+  const end = localDateKey(endsAt);
+  return Boolean(start && end && start === end);
+}
+
+const SAME_DAY_ENROLMENT_WARNING =
+  "Enrolment opens and closes on the same day. Guests will only have that day to book. Continue anyway?";
+
 const steps = [
   { id: "basics", title: "Basics", hint: "Name, summary and cover image" },
   { id: "place", title: "Place & time", hint: "Venue and enrolment window" },
@@ -160,12 +174,18 @@ export function EventForm({ mode, initial }: { mode: "create" | "edit"; initial:
     return "";
   }
 
+  function confirmSameDayEnrolment() {
+    if (!sameEnrollmentDay(values.enrollmentStartsAt, values.enrollmentEndsAt)) return true;
+    return window.confirm(SAME_DAY_ENROLMENT_WARNING);
+  }
+
   function goNext() {
     const error = validateStep();
     if (error) {
       setMessage(error);
       return;
     }
+    if (step === 1 && !confirmSameDayEnrolment()) return;
     setMessage("");
     setStep((value) => Math.min(value + 1, steps.length - 1));
   }
@@ -198,6 +218,7 @@ export function EventForm({ mode, initial }: { mode: "create" | "edit"; initial:
       setMessage(error);
       return;
     }
+    if (!confirmSameDayEnrolment()) return;
 
     setPending(true);
     setMessage("");
@@ -439,6 +460,16 @@ export function EventForm({ mode, initial }: { mode: "create" | "edit"; initial:
               />
             </label>
           </div>
+          {sameEnrollmentDay(values.enrollmentStartsAt, values.enrollmentEndsAt) ? (
+            <p
+              role="status"
+              className="rounded-xl border border-amber-300/80 bg-amber-50 px-3.5 py-3 text-sm leading-relaxed text-amber-950"
+            >
+              <span className="font-semibold">Same-day enrolment window.</span> Opens and closes are on the same
+              calendar day — guests will only have that day to book. Double-check this is intentional before
+              continuing.
+            </p>
+          ) : null}
           <label className="block text-sm sm:max-w-xs">
             Capacity
             <input

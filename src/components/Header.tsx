@@ -40,10 +40,10 @@ export function Header() {
             {supportEmail()}
           </a>
           <Link
-            href="/book"
+            href="/events"
             className="rounded-full bg-burgundy px-4 py-2.5 text-xs font-semibold tracking-[0.06em] text-cream uppercase transition hover:bg-burgundy/90"
           >
-            Enrol
+            Hangouts
           </Link>
         </div>
       </div>

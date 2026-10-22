@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/admin-session";
-import { AdminError, createAdmin, listAdmins } from "@/lib/admins";
+import { AdminError, createAdmin, listAdminsPublic } from "@/lib/admins";
 import { writeAudit } from "@/lib/audit";
 import { isAdminRole } from "@/lib/roles";
 
 export async function GET() {
   const admin = await requireCapability("settings");
   if (!admin) return NextResponse.json({ message: "Sign in again." }, { status: 401 });
-  const admins = await listAdmins();
-  return NextResponse.json({
-    admins: admins.map((row) => ({
-      email: row.email,
-      role: row.role,
-      mfaEnabled: row.mfaEnabled,
-    })),
-  });
+  const admins = await listAdminsPublic();
+  return NextResponse.json({ admins });
 }
 
 export async function POST(request: Request) {

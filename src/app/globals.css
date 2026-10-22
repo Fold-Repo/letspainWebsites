@@ -34,6 +34,15 @@ body {
   color: var(--color-ink);
 }
 
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2375294d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 0.75rem 0.5rem;
+  padding-right: 2.75rem;
+}
+
 .field:focus {
   outline: 2px solid var(--color-burgundy);
   outline-offset: 2px;
@@ -288,6 +297,61 @@ body {
   .landing-slash,
   .landing-dot {
     animation: none !important;
+  }
+}
+
+/* Single hangout detail */
+.event-hero-veil {
+  background:
+    linear-gradient(180deg, rgba(40, 18, 28, 0.28) 0%, rgba(40, 18, 28, 0.12) 40%, rgba(40, 18, 28, 0.78) 100%),
+    linear-gradient(90deg, rgba(75, 24, 50, 0.4) 0%, transparent 60%);
+}
+
+.event-detail-card {
+  animation: landing-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.event-fade-up {
+  animation: landing-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.event-fade-up-delay {
+  animation: landing-rise 0.95s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.event-fade-up-late {
+  animation: landing-rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.event-fact {
+  animation: landing-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.event-ticket-row {
+  transition: background 0.25s ease, padding-left 0.25s ease;
+}
+
+.event-ticket-row:hover {
+  background: color-mix(in srgb, var(--color-burgundy) 4%, transparent);
+  padding-left: 0.35rem;
+}
+
+.event-aside {
+  animation: landing-rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-fade-up,
+  .event-fade-up-delay,
+  .event-fade-up-late,
+  .event-fact,
+  .event-aside,
+  .event-detail-card {
+    animation: none !important;
+  }
+
+  .event-ticket-row:hover {
+    padding-left: 0;
   }
 }
 

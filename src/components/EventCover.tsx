@@ -1,16 +1,24 @@
 import Image from "next/image";
-import { eventCoverUrl, hasCustomCover, type Hangout } from "@/lib/events";
+import { eventCoverUrl, hasCustomCover, type Hangout } from "@/lib/hangout";
 
 type Props = {
   event: Pick<Hangout, "imageUrl" | "name">;
+  /** Override cover URL (e.g. a random light scene background). */
+  src?: string;
   className?: string;
   sizes?: string;
   priority?: boolean;
 };
 
-export function EventCover({ event, className = "", sizes = "(max-width: 768px) 100vw, 480px", priority }: Props) {
-  const src = eventCoverUrl(event);
+export function EventCover({
+  event,
+  src: srcOverride,
+  className = "",
+  sizes = "(max-width: 768px) 100vw, 480px",
+  priority,
+}: Props) {
   const custom = hasCustomCover(event);
+  const src = custom ? eventCoverUrl(event) : srcOverride || eventCoverUrl(event);
   const useNativeImg = src.startsWith("http") || src.startsWith("/api/");
 
   return (
@@ -21,7 +29,7 @@ export function EventCover({ event, className = "", sizes = "(max-width: 768px) 
       ) : (
         <Image
           src={src}
-          alt={custom ? event.name : "Painting hangout placeholder"}
+          alt={custom ? event.name : "Painting hangout scene"}
           fill
           priority={priority}
           sizes={sizes}
