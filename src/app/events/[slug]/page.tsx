@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EventCover } from "@/components/EventCover";
 import { formatLondon, getEvent, isEnrollmentOpen, storyParagraphs } from "@/lib/events";
 import { formatGbp } from "@/lib/money";
 import { listCategories, remainingSeats } from "@/lib/ticket-categories";
@@ -39,6 +40,12 @@ export default async function EventPage({ params }: Params) {
 
   return (
     <article className="mx-auto max-w-3xl px-5 py-14">
+      <EventCover
+        event={hangout}
+        className="mb-8 aspect-[16/9] rounded-[1.6rem]"
+        sizes="(max-width: 768px) 100vw, 720px"
+        priority
+      />
       <p className="text-xs tracking-[0.2em] text-burgundy uppercase">
         {hangout.city} · {hangout.whenLabel}
       </p>

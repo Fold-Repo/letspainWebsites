@@ -291,6 +291,216 @@ body {
   }
 }
 
+/* Admin back office — dashboard shell (brand colours) */
+.admin-app {
+  min-height: 100vh;
+  background: color-mix(in srgb, var(--color-cream) 70%, white);
+}
+
+.admin-sidebar {
+  background: linear-gradient(180deg, #4d1832 0%, var(--color-burgundy) 55%, #3a1226 100%);
+  color: white;
+}
+
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  color: color-mix(in srgb, white 72%, transparent);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.admin-nav-link:hover {
+  background: color-mix(in srgb, white 8%, transparent);
+  color: white;
+}
+
+.admin-nav-link-active {
+  background: color-mix(in srgb, var(--color-pink) 35%, var(--color-burgundy));
+  color: white;
+  font-weight: 600;
+}
+
+.admin-sidebar-card {
+  border-radius: 1.1rem;
+  background: color-mix(in srgb, var(--color-ink) 35%, transparent);
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, white 12%, transparent);
+}
+
+.admin-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .admin-topbar {
+    padding: 1.5rem 1.75rem 0.75rem;
+  }
+}
+
+.admin-main {
+  padding: 0.75rem 1.25rem 2rem;
+}
+
+@media (min-width: 640px) {
+  .admin-main {
+    padding: 0.5rem 1.75rem 2.5rem;
+  }
+}
+
+.admin-card {
+  border-radius: 1.15rem;
+  background: white;
+  border: 1px solid color-mix(in srgb, var(--color-burgundy) 8%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--color-burgundy) 6%, transparent);
+}
+
+.admin-metric {
+  padding: 1.15rem 1.2rem;
+}
+
+.admin-metric-label {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--color-ink) 55%, transparent);
+}
+
+.admin-metric-value {
+  margin-top: 0.45rem;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.admin-metric-icon {
+  display: inline-flex;
+  height: 2.4rem;
+  width: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+}
+
+.admin-chip {
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-burgundy) 15%, transparent);
+  background: white;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-burgundy);
+}
+
+.admin-btn-primary {
+  align-items: center;
+  border-radius: 999px;
+  background: var(--color-burgundy);
+  padding: 0.55rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
+
+.admin-btn-primary:hover {
+  background: color-mix(in srgb, var(--color-burgundy) 88%, black);
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.admin-badge-paid {
+  background: color-mix(in srgb, #1f7a4d 14%, white);
+  color: #1f7a4d;
+}
+
+.admin-badge-unpaid {
+  background: color-mix(in srgb, var(--color-gold) 22%, white);
+  color: #8a5a12;
+}
+
+.admin-badge-link {
+  background: color-mix(in srgb, var(--color-pink) 35%, white);
+  color: var(--color-burgundy);
+}
+
+.admin-badge-free {
+  background: color-mix(in srgb, var(--color-cream) 60%, white);
+  color: var(--color-ink);
+}
+
+.admin-badge-in {
+  background: color-mix(in srgb, var(--color-burgundy) 12%, white);
+  color: var(--color-burgundy);
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.admin-table th {
+  padding: 0.85rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-burgundy) 10%, transparent);
+}
+
+.admin-table td {
+  padding: 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-burgundy) 7%, transparent);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-banner {
+  border-radius: 1.2rem;
+  background: linear-gradient(120deg, var(--color-burgundy), #9a3d66 55%, var(--color-pink));
+  color: white;
+  padding: 1.25rem 1.4rem;
+}
+
+.admin-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.lap-day-picker {
+  --rdp-accent-color: var(--color-burgundy);
+  --rdp-accent-background-color: color-mix(in srgb, var(--color-burgundy) 12%, white);
+  --rdp-today-color: var(--color-burgundy);
+  font-family: var(--font-sans);
+}
+
 @media print {
   header,
   footer,

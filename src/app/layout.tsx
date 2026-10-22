@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Outfit } from "next/font/google";
-import { CookieBanner } from "@/components/CookieBanner";
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
+import { SiteChrome } from "@/components/SiteChrome";
 import { publicSiteUrl } from "@/lib/event";
 import "./globals.css";
 
@@ -52,10 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
-        <Header />
-        <main id="content">{children}</main>
-        <Footer />
-        <CookieBanner />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

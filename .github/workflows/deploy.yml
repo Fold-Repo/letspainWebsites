@@ -151,6 +151,7 @@ jobs:
       - name: Ensure deploy directory exists
         uses: appleboy/ssh-action@v1.2.0
         with:
+          script_stop: false
           host: ${{ env.DEPLOY_HOST }}
           username: ${{ env.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -182,9 +183,11 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           port: ${{ env.DEPLOY_SSH_PORT }}
+          script_stop: false
+          command_timeout: 20m
           envs: GHCR_TOKEN,GHCR_USERNAME
           script: |
-            set -euo pipefail
+            bash -euo pipefail <<'DEPLOY_SCRIPT'
             DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
             cd "$DEPLOY_PATH"
 
@@ -238,14 +241,26 @@ jobs:
             fi
 
             echo "Waiting for the app on 127.0.0.1:3020..."
+            set +e
             app_ok=0
-            for i in $(seq 1 45); do
-              if curl -fsS http://127.0.0.1:3020/api/health >/dev/null 2>&1; then
+            i=0
+            while [ "$i" -lt 30 ]; do
+              i=$((i + 1))
+              code=$(curl -sS -m 5 -o /tmp/lap-health.body -w '%{http_code}' http://127.0.0.1:3020/api/health 2>/tmp/lap-health.err)
+              echo "health attempt ${i}: http=${code:-none} curl_err=$(tr '\n' ' ' < /tmp/lap-health.err)"
+              if [ "$code" = "200" ]; then
                 app_ok=1
                 break
               fi
+              if [ "$i" = "1" ] || [ "$i" = "5" ]; then
+                echo "body: $(cat /tmp/lap-health.body 2>/dev/null)"
+                docker inspect --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' lets-all-paints
+                docker compose ps
+                docker compose logs --tail=120 web
+              fi
               sleep 2
             done
+            set -e
             if [ "$app_ok" -ne 1 ]; then
               echo "Health check failed after deploy."
               docker compose ps
@@ -303,6 +318,8 @@ jobs:
               fi
               sleep 2
             done
-            echo "HTTPS health check failed."
+            echo "HTTPS health check failed. App is up on 127.0.0.1:3020; check DNS and nginx."
             nginx -t || true
+            curl -fsS http://127.0.0.1:3020/api/health || true
             exit 1
+            DEPLOY_SCRIPT

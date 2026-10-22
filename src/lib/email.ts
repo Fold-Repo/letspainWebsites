@@ -77,6 +77,9 @@ async function hangoutFor(booking: Booking): Promise<Hangout> {
     familyPricePence: null,
     paymentTiming: "later",
     published: false,
+    imageUrl: "",
+    eventDate: "",
+    eventTime: "",
   };
 }
 

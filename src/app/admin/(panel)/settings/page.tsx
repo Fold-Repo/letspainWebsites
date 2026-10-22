@@ -1,4 +1,4 @@
-import { AdminRolesForm } from "@/components/AdminRolesForm";
+import { AdminTeamPanel } from "@/components/AdminTeamPanel";
 import { MfaSetupForm } from "@/components/MfaSetupForm";
 import { requirePageCapability } from "@/lib/admin-session";
 import { getAdminByEmail, listAdmins } from "@/lib/admins";
@@ -12,18 +12,17 @@ export default async function AdminSettingsPage() {
   const admins = await listAdmins();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 px-5 py-10">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <p className="text-xs tracking-[0.18em] text-burgundy uppercase">Security</p>
-        <h1 className="mt-2 font-display text-5xl">Settings</h1>
-        <p className="mt-3 text-ink/70">
-          Signed in as {admin.email} ({roleLabel(admin.role)}). Turn on authenticator MFA and manage team roles.
+        <h2 className="admin-page-title">Settings</h2>
+        <p className="mt-1 text-sm text-ink/55">
+          Signed in as {admin.email} ({roleLabel(admin.role)}). MFA and team access.
         </p>
       </div>
 
-      <section className="rounded-[1.4rem] bg-white p-5 sm:p-8">
-        <h2 className="font-display text-3xl">Authenticator MFA</h2>
-        <p className="mt-2 text-sm text-ink/70">
+      <section className="admin-card p-5 sm:p-7">
+        <h3 className="text-lg font-semibold text-ink">Authenticator MFA</h3>
+        <p className="mt-2 text-sm text-ink/60">
           Scan the QR code with Google Authenticator, 1Password, or Authy. After it is enabled, every sign-in needs a
           6-digit code.
         </p>
@@ -32,14 +31,15 @@ export default async function AdminSettingsPage() {
         </div>
       </section>
 
-      <section className="rounded-[1.4rem] bg-cream/50 p-5 sm:p-8">
-        <h2 className="font-display text-3xl">Team roles</h2>
-        <p className="mt-2 text-sm text-ink/70">
-          Owner: full access. Editor: events, bookings, partnerships, check-in. Door: check-in only. Extra accounts are
-          created by inserting into the <code className="text-xs">admins</code> table; change their role here.
+      <section className="admin-card p-5 sm:p-7">
+        <h3 className="text-lg font-semibold text-ink">Team</h3>
+        <p className="mt-2 text-sm text-ink/60">
+          Owner: full access. Editor: events, bookings, partnerships, check-in. Door: check-in only. The first owner is
+          seeded from <code className="text-xs">ADMIN_EMAIL</code> / <code className="text-xs">ADMIN_PASSWORD</code> on
+          startup.
         </p>
         <div className="mt-6">
-          <AdminRolesForm
+          <AdminTeamPanel
             selfEmail={admin.email}
             initial={admins.map((row) => ({
               email: row.email,

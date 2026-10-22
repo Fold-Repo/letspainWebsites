@@ -1,6 +1,16 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { query } from "./db";
+import { hashPassword } from "./password";
 import { isAdminRole, type AdminRole } from "./roles";
+
+export class AdminError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 export type AdminRecord = {
   id: number;
@@ -75,6 +85,39 @@ export async function setAdminMfa(email: string, secret: string | null, enabled:
 
 export async function updateAdminRole(email: string, role: AdminRole) {
   await query("UPDATE admins SET role = $2 WHERE email = $1", [email, role]);
+}
+
+export async function createAdmin(input: { email: string; password: string; role: AdminRole }) {
+  const email = input.email.trim().toLowerCase();
+  const password = input.password;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new AdminError("Enter a valid email.", 400);
+  }
+  if (password.length < 8) {
+    throw new AdminError("Password must be at least 8 characters.", 400);
+  }
+  if (!isAdminRole(input.role)) {
+    throw new AdminError("Choose a valid role.", 400);
+  }
+  const existing = await getAdminByEmail(email);
+  if (existing) {
+    throw new AdminError("That email is already an admin.", 409);
+  }
+  const passwordHash = await hashPassword(password);
+  try {
+    await query("INSERT INTO admins (email, password_hash, role) VALUES ($1, $2, $3)", [
+      email,
+      passwordHash,
+      input.role,
+    ]);
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (code === "23505") {
+      throw new AdminError("That email is already an admin.", 409);
+    }
+    throw error;
+  }
+  return { email, role: input.role, mfaEnabled: false };
 }
 
 export async function listAdmins() {

@@ -29,9 +29,12 @@ services:
       PORT: 3010
       HOSTNAME: 0.0.0.0
       DATABASE_URL: postgres://paints:${POSTGRES_PASSWORD:-paints}@db:5432/letsallpaints
+    volumes:
+      - paints-uploads:/app/data
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   paints-pg:
+  paints-uploads:

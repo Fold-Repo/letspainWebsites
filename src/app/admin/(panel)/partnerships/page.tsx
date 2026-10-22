@@ -21,23 +21,30 @@ export default async function PartnershipsAdminPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-10">
-      <p className="text-xs tracking-[0.18em] text-burgundy uppercase">Inbox</p>
-      <h1 className="mt-2 font-display text-5xl">Partnership enquiries</h1>
-      <p className="mt-3 text-ink/70">
-        {enquiries.length} {enquiries.length === 1 ? "enquiry" : "enquiries"}
-      </p>
-      {error ? <p className="mt-6 rounded-2xl bg-pink/40 px-4 py-3">{error}</p> : null}
-      {!error && enquiries.length === 0 ? <p className="mt-8 text-ink/70">No partnership enquiries yet.</p> : null}
-      <div className="mt-8 space-y-4">
+    <div className="space-y-6">
+      <div>
+        <h2 className="admin-page-title">Partnerships</h2>
+        <p className="mt-1 text-sm text-ink/55">
+          {enquiries.length} {enquiries.length === 1 ? "enquiry" : "enquiries"} from the public form.
+        </p>
+      </div>
+      {error ? <p className="rounded-2xl bg-pink/40 px-4 py-3 text-sm">{error}</p> : null}
+      {!error && enquiries.length === 0 ? (
+        <div className="admin-card px-5 py-12 text-center text-sm text-ink/60">No partnership enquiries yet.</div>
+      ) : null}
+      <div className="grid gap-4 lg:grid-cols-2">
         {enquiries.map((enquiry) => (
-          <article key={enquiry.id} className="rounded-[1.4rem] bg-white p-5">
-            <p className="text-xs tracking-[0.14em] text-burgundy uppercase">
-              {categoryLabel(enquiry.category)} · {new Date(enquiry.createdAt).toLocaleString("en-GB")}
-            </p>
-            <h2 className="mt-2 font-display text-3xl">{enquiry.organisation}</h2>
-            <p className="mt-1 text-sm">
-              {enquiry.name} · <a className="text-burgundy" href={`mailto:${enquiry.email}`}>{enquiry.email}</a>
+          <article key={enquiry.id} className="admin-card p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="admin-badge admin-badge-link">{categoryLabel(enquiry.category)}</span>
+              <span className="text-xs text-ink/45">{new Date(enquiry.createdAt).toLocaleString("en-GB")}</span>
+            </div>
+            <h3 className="mt-3 text-xl font-semibold text-ink">{enquiry.organisation}</h3>
+            <p className="mt-1 text-sm text-ink/70">
+              {enquiry.name} ·{" "}
+              <a className="text-burgundy" href={`mailto:${enquiry.email}`}>
+                {enquiry.email}
+              </a>
               {enquiry.phone ? ` · ${enquiry.phone}` : ""}
             </p>
             {enquiry.website ? (
@@ -47,8 +54,8 @@ export default async function PartnershipsAdminPage() {
                 </a>
               </p>
             ) : null}
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink/80">{enquiry.message}</p>
-            <p className="mt-3 text-xs text-ink/50">{inboxLabel(enquiry)}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink/75">{enquiry.message}</p>
+            <p className="mt-3 text-xs text-ink/45">{inboxLabel(enquiry)}</p>
           </article>
         ))}
       </div>

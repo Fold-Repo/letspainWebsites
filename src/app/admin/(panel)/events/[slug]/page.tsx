@@ -27,6 +27,8 @@ export default async function EditEventPage({ params }: { params: Promise<{ slug
     venue: hangout.venue,
     whenLabel: hangout.whenLabel,
     timeLabel: hangout.timeLabel,
+    eventDate: hangout.eventDate,
+    eventTime: hangout.eventTime,
     story: hangout.story,
     inclusions: hangout.inclusions.join("\n"),
     capacity: String(hangout.capacity),
@@ -37,18 +39,21 @@ export default async function EditEventPage({ params }: { params: Promise<{ slug
     familyPrice: pounds(hangout.familyPricePence),
     paymentTiming: hangout.paymentTiming,
     published: hangout.published,
+    imageUrl: hangout.imageUrl,
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs tracking-[0.18em] text-burgundy uppercase">Back office</p>
-      <h1 className="mt-2 font-display text-5xl">{hangout.name}</h1>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h2 className="admin-page-title">{hangout.name}</h2>
+        <p className="mt-1 text-sm text-ink/55">Event details and ticket categories.</p>
+      </div>
       {!hangout.isFree && hangout.pricePence == null && categories.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-pink/40 px-4 py-3 text-sm">
+        <p className="rounded-2xl bg-pink/40 px-4 py-3 text-sm">
           Add ticket categories below, or set a fallback price per person, before anyone is charged.
         </p>
       ) : null}
-      <div className="mt-8 rounded-[1.4rem] bg-white p-5 sm:p-8">
+      <div className="admin-card p-5 sm:p-8">
         <EventForm mode="edit" initial={initial} />
         <TicketCategoriesAdmin slug={slug} initial={categories} />
       </div>

@@ -34,9 +34,12 @@ services:
       HOSTNAME: 0.0.0.0
       PUBLIC_SITE_URL: https://letsallpaint.com
       DATABASE_URL: postgres://paints:${POSTGRES_PASSWORD}@db:5432/letsallpaints
+    volumes:
+      - paints-uploads:/app/data
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   paints-pg:
+  paints-uploads:

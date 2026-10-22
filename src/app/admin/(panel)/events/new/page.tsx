@@ -12,6 +12,8 @@ const blank: EventFormValues = {
   venue: "",
   whenLabel: "",
   timeLabel: "",
+  eventDate: "",
+  eventTime: "",
   story: "",
   inclusions: "",
   capacity: "80",
@@ -22,15 +24,18 @@ const blank: EventFormValues = {
   familyPrice: "",
   paymentTiming: "later",
   published: true,
+  imageUrl: "",
 };
 
 export default async function NewEventPage() {
   await requirePageCapability("events");
   return (
-    <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs tracking-[0.18em] text-burgundy uppercase">Back office</p>
-      <h1 className="mt-2 font-display text-5xl">New event</h1>
-      <div className="mt-8 rounded-[1.4rem] bg-white p-5 sm:p-8">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h2 className="admin-page-title">New event</h2>
+        <p className="mt-1 text-sm text-ink/55">Set Adult, Child and Family prices when the hangout is paid.</p>
+      </div>
+      <div className="admin-card p-5 sm:p-8">
         <EventForm mode="create" initial={blank} />
       </div>
     </div>

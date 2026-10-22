@@ -1,3 +1,4 @@
+import { formatDisplayDate, formatDisplayTime, isValidIsoDate, isValidTime } from "./datetime-input";
 import { query } from "./db";
 import { poundsToPence } from "./money";
 
@@ -23,6 +24,9 @@ export type Hangout = {
   familyPricePence: number | null;
   paymentTiming: PaymentTiming;
   published: boolean;
+  imageUrl: string;
+  eventDate: string;
+  eventTime: string;
 };
 
 export type EventInput = {
@@ -44,6 +48,9 @@ export type EventInput = {
   familyPricePence: number | null;
   paymentTiming: PaymentTiming;
   published: boolean;
+  imageUrl: string;
+  eventDate: string;
+  eventTime: string;
 };
 
 type EventRow = {
@@ -65,6 +72,9 @@ type EventRow = {
   family_price_pence: number | null;
   payment_timing: PaymentTiming;
   published: boolean;
+  image_url: string | null;
+  event_date: Date | string | null;
+  event_time: string | null;
 };
 
 export class EventError extends Error {
@@ -130,7 +140,21 @@ function lines(value: string) {
     .filter(Boolean);
 }
 
+function toIsoDate(value: Date | string | null | undefined) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match?.[1] && isValidIsoDate(match[1]) ? match[1] : "";
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  return "";
+}
+
 export function mapEvent(row: EventRow): Hangout {
+  const eventDate = toIsoDate(row.event_date);
+  const eventTime = isValidTime((row.event_time ?? "").trim()) ? (row.event_time ?? "").trim() : "";
   return {
     slug: row.slug,
     name: row.name,
@@ -138,8 +162,8 @@ export function mapEvent(row: EventRow): Hangout {
     summary: row.summary,
     city: row.city,
     venue: row.venue,
-    whenLabel: row.when_label,
-    timeLabel: row.time_label,
+    whenLabel: row.when_label || (eventDate ? formatDisplayDate(eventDate) : ""),
+    timeLabel: row.time_label || (eventTime ? formatDisplayTime(eventTime) : ""),
     story: row.story,
     inclusions: lines(row.inclusions),
     capacity: row.capacity,
@@ -150,7 +174,19 @@ export function mapEvent(row: EventRow): Hangout {
     familyPricePence: row.family_price_pence,
     paymentTiming: row.payment_timing,
     published: row.published,
+    imageUrl: (row.image_url ?? "").trim(),
+    eventDate,
+    eventTime,
   };
+}
+
+/** Cover image for cards and detail pages; falls back to a stock placeholder. */
+export function eventCoverUrl(hangout: Pick<Hangout, "imageUrl">) {
+  return hangout.imageUrl || "/landing-hero.webp";
+}
+
+export function hasCustomCover(hangout: Pick<Hangout, "imageUrl">) {
+  return Boolean(hangout.imageUrl);
 }
 
 export function storyParagraphs(story: string) {
@@ -228,6 +264,22 @@ export function parseEventInput(body: unknown, slugOverride?: string): EventInpu
     .filter(Boolean)
     .slice(0, 12)
     .join("\n");
+  const imageUrl = clean(source.imageUrl, 500);
+  if (imageUrl && !imageUrl.startsWith("/") && !/^https?:\/\//i.test(imageUrl)) {
+    throw new EventError("Image must be an uploaded path or http(s) URL.", 400);
+  }
+  const eventDate = clean(source.eventDate, 10);
+  const eventTime = clean(source.eventTime, 5);
+  if (eventDate && !isValidIsoDate(eventDate)) {
+    throw new EventError("Choose a valid event date.", 400);
+  }
+  if (eventTime && !isValidTime(eventTime)) {
+    throw new EventError("Choose a valid event time.", 400);
+  }
+  const whenLabel =
+    clean(source.whenLabel, 80) || (eventDate ? formatDisplayDate(eventDate) : "");
+  const timeLabel =
+    clean(source.timeLabel, 80) || (eventTime ? formatDisplayTime(eventTime) : "");
   return {
     slug,
     name,
@@ -235,8 +287,8 @@ export function parseEventInput(body: unknown, slugOverride?: string): EventInpu
     summary: clean(source.summary, 400),
     city: clean(source.city, 80),
     venue: clean(source.venue, 120),
-    whenLabel: clean(source.whenLabel, 80),
-    timeLabel: clean(source.timeLabel, 80),
+    whenLabel,
+    timeLabel,
     story: String(source.story ?? "").trim().slice(0, 4000),
     inclusions,
     capacity,
@@ -247,12 +299,15 @@ export function parseEventInput(body: unknown, slugOverride?: string): EventInpu
     familyPricePence,
     paymentTiming: isFree ? "later" : paymentTiming,
     published: source.published !== false,
+    imageUrl,
+    eventDate,
+    eventTime,
   };
 }
 
 const columns = `slug, name, tagline, summary, city, venue, when_label, time_label, story, inclusions,
   capacity, enrollment_starts_at, enrollment_ends_at, is_free, price_pence, family_price_pence,
-  payment_timing, published`;
+  payment_timing, published, image_url, event_date, event_time`;
 
 export async function listEvents() {
   const result = await query<EventRow>(`SELECT ${columns} FROM events ORDER BY enrollment_starts_at DESC`);
@@ -276,14 +331,25 @@ export async function getFeaturedEvent(): Promise<Hangout | null> {
   return events.find((hangout) => isEnrollmentOpen(hangout)) ?? events.at(0) ?? null;
 }
 
+/** Published hangouts that are still open or not yet open — for the homepage carousel. */
+export async function listUpcomingEvents() {
+  const events = await listPublishedEvents();
+  return events
+    .filter((hangout) => enrollmentState(hangout) !== "closed")
+    .sort(
+      (a, b) =>
+        new Date(a.enrollmentStartsAt).getTime() - new Date(b.enrollmentStartsAt).getTime(),
+    );
+}
+
 export async function createEvent(input: EventInput) {
   try {
     const result = await query<EventRow>(
       `INSERT INTO events (
         slug, name, tagline, summary, city, venue, when_label, time_label, story, inclusions,
         capacity, enrollment_starts_at, enrollment_ends_at, is_free, price_pence, family_price_pence,
-        payment_timing, published
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        payment_timing, published, image_url, event_date, event_time
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
       RETURNING ${columns}`,
       eventValues(input),
     );
@@ -314,7 +380,10 @@ export async function updateEvent(slug: string, input: EventInput) {
       price_pence = $15,
       family_price_pence = $16,
       payment_timing = $17,
-      published = $18
+      published = $18,
+      image_url = $19,
+      event_date = $20,
+      event_time = $21
     WHERE slug = $1
     RETURNING ${columns}`,
     eventValues({ ...input, slug }),
@@ -342,6 +411,9 @@ function eventValues(input: EventInput) {
     input.familyPricePence,
     input.paymentTiming,
     input.published,
+    input.imageUrl,
+    input.eventDate || null,
+    input.eventTime || "",
   ];
 }
 

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getFeaturedEvent, storyParagraphs } from "@/lib/events";
+import { UpcomingEventsCarousel } from "@/components/UpcomingEventsCarousel";
+import { getFeaturedEvent, listUpcomingEvents, storyParagraphs } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +46,12 @@ const programs = [
 
 export default async function HomePage() {
   let featured: Awaited<ReturnType<typeof getFeaturedEvent>> = null;
+  let upcoming: Awaited<ReturnType<typeof listUpcomingEvents>> = [];
   try {
-    featured = await getFeaturedEvent();
+    [featured, upcoming] = await Promise.all([getFeaturedEvent(), listUpcomingEvents()]);
   } catch {
     featured = null;
+    upcoming = [];
   }
   const story = featured ? storyParagraphs(featured.story) : [];
   const eventHref = featured ? `/events/${featured.slug}` : "/events";
@@ -75,10 +78,13 @@ export default async function HomePage() {
               Creative moments. Great company. Lasting memories — a painting hangout for families and
               friends.
             </p>
-            <div className="mt-7">
-              <Link href="/book" className="landing-btn landing-btn-ink">
-                Enrol
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link href="/events" className="landing-btn landing-btn-ink">
+                See hangouts
                 <span aria-hidden>→</span>
+              </Link>
+              <Link href="/book" className="landing-btn border border-burgundy/20 bg-white text-burgundy">
+                Enrol
               </Link>
             </div>
           </div>
@@ -103,6 +109,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <UpcomingEventsCarousel events={upcoming} />
 
       <section className="border-t border-burgundy/8 bg-[#fbf8f4]">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">

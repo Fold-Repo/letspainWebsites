@@ -23,7 +23,7 @@ Promote staging → production only after: booking + Stripe webhook, admin login
 - **Editor** — events, bookings, partnerships, check-in, payment links.
 - **Door** — check-in only (`/admin/check-in`).
 
-Extra admins: insert a row into `admins` (hashed password), then set the role under **Settings**.
+Extra admins: create them under **Settings → Team** (email, temporary password, role). The bootstrap owner still comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD` on startup.
 
 ## MFA
 

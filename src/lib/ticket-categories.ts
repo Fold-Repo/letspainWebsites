@@ -188,6 +188,35 @@ export function parseCategoryInput(body: unknown): CategoryInput {
   };
 }
 
+/** Categories posted with a new event (Adult / Child / Family rows on the create form). */
+export function parseEventCategories(body: unknown): CategoryInput[] {
+  const source = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const raw = source.categories;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item, index) => {
+    const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    return parseCategoryInput({
+      ...row,
+      sortOrder: row.sortOrder ?? index,
+      active: row.active !== false && row.include !== false,
+    });
+  });
+}
+
+export async function replaceEventCategories(eventSlug: string, categories: CategoryInput[]) {
+  await query("DELETE FROM ticket_categories WHERE event_slug = $1", [eventSlug]);
+  const created = [];
+  for (const [index, input] of categories.entries()) {
+    created.push(
+      await createCategory(eventSlug, {
+        ...input,
+        sortOrder: input.sortOrder || index,
+      }),
+    );
+  }
+  return created;
+}
+
 export async function createCategory(eventSlug: string, input: CategoryInput) {
   const result = await query<CategoryRow>(
     `INSERT INTO ticket_categories

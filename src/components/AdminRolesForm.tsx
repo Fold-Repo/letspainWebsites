@@ -5,8 +5,15 @@ import { adminRoles, roleLabel, type AdminRole } from "@/lib/roles";
 
 type Row = { email: string; role: AdminRole; mfaEnabled: boolean };
 
-export function AdminRolesForm({ initial, selfEmail }: { initial: Row[]; selfEmail: string }) {
-  const [rows, setRows] = useState(initial);
+export function AdminRolesForm({
+  rows,
+  selfEmail,
+  onRoleChange,
+}: {
+  rows: Row[];
+  selfEmail: string;
+  onRoleChange: (email: string, role: AdminRole) => void;
+}) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -27,7 +34,7 @@ export function AdminRolesForm({ initial, selfEmail }: { initial: Row[]; selfEma
         setPending(null);
         return;
       }
-      setRows((prev) => prev.map((row) => (row.email === email ? { ...row, role } : row)));
+      onRoleChange(email, role);
       setMessage(`Updated ${email} to ${roleLabel(role)}.`);
       setPending(null);
     } catch {
