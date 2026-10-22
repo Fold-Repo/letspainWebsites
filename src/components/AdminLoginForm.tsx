@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PasswordField } from "@/components/PasswordField";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -101,10 +102,7 @@ export function AdminLoginForm() {
         Email
         <input name="email" type="email" autoComplete="username" required className="field" />
       </label>
-      <label className="block text-sm">
-        Password
-        <input name="password" type="password" autoComplete="current-password" required className="field" />
-      </label>
+      <PasswordField name="password" label="Password" autoComplete="current-password" required />
       {error ? (
         <p role="alert" className="text-sm text-burgundy">
           {error}

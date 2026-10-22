@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { PasswordField } from "@/components/PasswordField";
 import { adminRoles, roleLabel, type AdminRole } from "@/lib/roles";
 
 type Created = { id?: number; email: string; role: AdminRole; mfaEnabled: boolean; protected?: boolean };
@@ -56,18 +57,14 @@ export function AdminCreateUserForm({ onCreated }: { onCreated: (admin: Created)
             className="field"
           />
         </label>
-        <label className="block text-sm">
-          <span className="text-ink/70">Temporary password</span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="field"
-          />
-        </label>
+        <PasswordField
+          label="Temporary password"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
       </div>
       <label className="block text-sm sm:max-w-xs">
         <span className="text-ink/70">Role</span>

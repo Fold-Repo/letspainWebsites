@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { AdminCreateUserForm } from "@/components/AdminCreateUserForm";
+import { PasswordField } from "@/components/PasswordField";
 import { adminRoles, roleLabel, type AdminRole } from "@/lib/roles";
 
 export type AdminUserRow = {
@@ -199,18 +200,15 @@ export function AdminUsersManager({
                         <span className="mt-1 block text-xs text-ink/55">Seeded admin must remain an owner.</span>
                       ) : null}
                     </label>
-                    <label className="block text-sm">
-                      <span className="text-ink/70">New password (optional)</span>
-                      <input
-                        type="password"
-                        minLength={8}
-                        autoComplete="new-password"
-                        value={editPassword}
-                        onChange={(event) => setEditPassword(event.target.value)}
-                        className="field"
-                        placeholder="Leave blank to keep current"
-                      />
-                    </label>
+                    <PasswordField
+                      label="New password (optional)"
+                      minLength={8}
+                      autoComplete="new-password"
+                      value={editPassword}
+                      onChange={(event) => setEditPassword(event.target.value)}
+                      placeholder="Leave blank to keep current"
+                      hint="Leave blank to keep the current password."
+                    />
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="submit"
