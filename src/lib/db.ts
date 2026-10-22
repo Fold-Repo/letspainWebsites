@@ -1,5 +1,5 @@
 import { Pool, type QueryResultRow } from "pg";
-import { hashPassword, verifyPassword } from "./password";
+import { hashPassword } from "./password";
 
 const globalForPg = globalThis as unknown as { pool?: Pool; ready?: Promise<void>; schemaVersion?: number };
 
@@ -178,6 +178,11 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS event_date DATE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_time TEXT NOT NULL DEFAULT '';
 `;
 
+/**
+ * Bootstrap the first owner from ADMIN_EMAIL / ADMIN_PASSWORD.
+ * Runs on every process start, but only INSERTs when that email is missing.
+ * Existing rows are left alone so UI password changes survive redeploys.
+ */
 async function syncAdmin() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD ?? "";
@@ -186,29 +191,21 @@ async function syncAdmin() {
     throw new Error("ADMIN_PASSWORD must be at least 8 characters.");
   }
   const pool = getPool();
+  const existing = await pool.query<{ id: number }>("SELECT id FROM admins WHERE email = $1", [email]);
+  if ((existing.rowCount ?? 0) > 0) return;
+
   const hash = await hashPassword(password);
   const roleEnv = (process.env.ADMIN_ROLE ?? "owner").trim().toLowerCase();
   const role = roleEnv === "editor" || roleEnv === "door" ? roleEnv : "owner";
-  const existing = await pool.query<{ password_hash: string; role: string }>(
-    "SELECT password_hash, role FROM admins WHERE email = $1",
-    [email],
-  );
-  if (existing.rowCount === 0) {
-    try {
-      await pool.query("INSERT INTO admins (email, password_hash, role) VALUES ($1, $2, $3)", [
-        email,
-        hash,
-        role,
-      ]);
-    } catch (error) {
-      const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-      if (code !== "23505") throw error;
-    }
-    return;
-  }
-  const current = existing.rows[0]?.password_hash ?? "";
-  if (!(await verifyPassword(password, current))) {
-    await pool.query("UPDATE admins SET password_hash = $2 WHERE email = $1", [email, hash]);
+  try {
+    await pool.query("INSERT INTO admins (email, password_hash, role) VALUES ($1, $2, $3)", [
+      email,
+      hash,
+      role,
+    ]);
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (code !== "23505") throw error;
   }
 }
 

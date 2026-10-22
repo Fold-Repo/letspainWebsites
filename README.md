@@ -21,7 +21,7 @@ Open http://localhost:3010. Admin is http://localhost:3010/admin.
 
 Postgres is published on host port 5435 so it can sit beside another database. Set `POSTGRES_PORT` if you want a different host port, and match it in `DATABASE_URL`. Inside Docker the app uses `db:5432`.
 
-Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` (8+ characters), and `ADMIN_SESSION_SECRET` before the first start. The admin row is created from those values.
+Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` (8+ characters), and `ADMIN_SESSION_SECRET` before the first start. The admin row is created from those values only if that email is not already in the database.
 
 ## Stripe and email
 

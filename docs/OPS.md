@@ -13,7 +13,7 @@ Promote staging → production only after: booking + Stripe webhook, admin login
 ## Secrets
 
 - `ADMIN_SESSION_SECRET` ≥ 32 characters (also derives MFA secret encryption).
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` seed or rotate the bootstrap owner on startup.
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` create the bootstrap owner on first startup only (skipped if that email already exists).
 - `ADMIN_ROLE` optional seed role: `owner` (default), `editor`, or `door`.
 - Never commit `.env.local`. Rotate Stripe and SMTP credentials if they leak.
 
@@ -23,7 +23,7 @@ Promote staging → production only after: booking + Stripe webhook, admin login
 - **Editor** — events, bookings, partnerships, check-in, payment links.
 - **Door** — check-in only (`/admin/check-in`).
 
-Extra admins: create them under **Settings → Team** (email, temporary password, role). The bootstrap owner still comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD` on startup.
+Extra admins: create them under **Users** (email, temporary password, role). The bootstrap owner is created once from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; password resets after that happen in the Users UI, not via env.
 
 ## MFA
 
@@ -59,5 +59,5 @@ docker compose exec -T db pg_dump -U paints letsallpaints > backup-$(date +%F).s
 
 ## Incident notes
 
-- Compromised admin password: rotate hash via `ADMIN_PASSWORD` restart or SQL update; force MFA on; review `audit_logs`.
+- Compromised admin password: reset it in **Users**, or update `password_hash` in SQL; force MFA on; review `audit_logs`.
 - Stripe webhook gap: reconcile unpaid bookings against Dashboard sessions, then re-send payment links if needed.
