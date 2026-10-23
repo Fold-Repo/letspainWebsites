@@ -1,7 +1,7 @@
 export const brand = "Let's All Paints";
 
 export function supportEmail() {
-  return process.env.SUPPORT_EMAIL || "hello@letsallpaints.com";
+  return process.env.SUPPORT_EMAIL || "hello@letsallpaint.com";
 }
 
 export function publicSiteUrl() {
