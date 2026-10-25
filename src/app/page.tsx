@@ -79,12 +79,9 @@ export default async function HomePage() {
               friends.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/events" className="landing-btn landing-btn-ink">
-                See hangouts
+              <Link href="/events/eat-drink-paint" className="landing-btn landing-btn-ink">
+                Buy ticket now
                 <span aria-hidden>→</span>
-              </Link>
-              <Link href="/events" className="landing-btn border border-burgundy/20 bg-white text-burgundy">
-                Browse hangouts
               </Link>
             </div>
           </div>
@@ -168,8 +165,8 @@ export default async function HomePage() {
             <Link href="/about" className="landing-btn landing-btn-gold">
               Our story
             </Link>
-            <Link href="/events" className="landing-btn landing-btn-ink">
-              See hangouts
+            <Link href="/events/eat-drink-paint" className="landing-btn landing-btn-ink">
+              Buy ticket now
             </Link>
           </div>
         </div>

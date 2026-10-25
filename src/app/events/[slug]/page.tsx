@@ -218,12 +218,6 @@ export default async function EventPage({ params }: Params) {
                     : "Enrolment for this hangout is not open yet."}
                 </p>
               )}
-              <Link
-                href="/events"
-                className="mt-3 block text-center text-xs font-semibold tracking-[0.14em] text-cream/60 uppercase transition hover:text-cream sm:mt-4"
-              >
-                Browse other hangouts
-              </Link>
             </div>
           </div>
         </aside>
