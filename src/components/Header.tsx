@@ -8,6 +8,7 @@ const links = [
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
   { href: "/partnerships", label: "Partner" },
+  { href: "/refund", label: "Request refund" },
 ];
 
 export function Header() {
