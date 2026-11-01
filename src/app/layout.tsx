@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Outfit } from "next/font/google";
 import { SiteChrome } from "@/components/SiteChrome";
 import { publicSiteUrl } from "@/lib/event";
+import { getSocialSettings } from "@/lib/site-settings";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -43,14 +44,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const social = await getSocialSettings();
+
   return (
     <html lang="en">
       <body className={`${fraunces.variable} ${outfit.variable} antialiased`}>
         <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome social={social}>{children}</SiteChrome>
       </body>
     </html>
   );

@@ -3,10 +3,16 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { CookieBanner } from "@/components/CookieBanner";
-import { Footer } from "@/components/Footer";
+import { Footer, type FooterSocialLinks } from "@/components/Footer";
 import { Header } from "@/components/Header";
 
-export function SiteChrome({ children }: { children: ReactNode }) {
+export function SiteChrome({
+  children,
+  social,
+}: {
+  children: ReactNode;
+  social: FooterSocialLinks;
+}) {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
 
@@ -18,7 +24,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
     <>
       <Header />
       <main id="content">{children}</main>
-      <Footer />
+      <Footer social={social} />
       <CookieBanner />
     </>
   );

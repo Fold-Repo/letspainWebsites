@@ -3,7 +3,7 @@ import { hashPassword } from "./password";
 
 const globalForPg = globalThis as unknown as { pool?: Pool; ready?: Promise<void>; schemaVersion?: number };
 
-const schemaVersion = 10;
+const schemaVersion = 11;
 
 export function getPool() {
   const connectionString = process.env.DATABASE_URL;
@@ -176,6 +176,12 @@ CREATE INDEX IF NOT EXISTS consent_records_created_at_idx ON consent_records (cr
 ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_date DATE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_time TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `;
 
 /**
