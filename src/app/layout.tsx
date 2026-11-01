@@ -45,7 +45,16 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const social = await getSocialSettings();
+  let social: Awaited<ReturnType<typeof getSocialSettings>> = {
+    instagram: "#",
+    facebook: "#",
+  };
+  // Defensive: never let footer settings take down the whole site during DB blips.
+  try {
+    social = await getSocialSettings();
+  } catch {
+    social = { instagram: "#", facebook: "#" };
+  }
 
   return (
     <html lang="en">

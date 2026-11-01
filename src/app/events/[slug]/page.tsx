@@ -21,13 +21,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function EventPage({ params }: Params) {
   const { slug } = await params;
-  const hangout = await getEvent(slug);
+  const hangout = await getEvent(slug).catch(() => null);
   if (!hangout || !hangout.published) notFound();
   const open = isEnrollmentOpen(hangout);
-  const remaining = await remainingSeats(hangout.slug, hangout.capacity);
+  const remaining = await remainingSeats(hangout.slug, hangout.capacity).catch(() => 0);
   const soldOut = remaining <= 0;
   const canEnrol = open && !soldOut;
-  const tickets = await listCategories(hangout.slug, true);
+  const tickets = await listCategories(hangout.slug, true).catch(() => []);
   const story = storyParagraphs(hangout.story);
   const heroSrc = hasCustomCover(hangout) ? undefined : pickSceneBackground();
 
