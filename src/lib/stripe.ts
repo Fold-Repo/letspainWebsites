@@ -86,3 +86,20 @@ export async function settlePaidSession(code: string, sessionId: string, amountP
   }
   return booking;
 }
+
+export async function refundCheckoutSession(sessionId: string) {
+  if (!sessionId.startsWith("cs_")) {
+    throw new Error("This booking has no Stripe Checkout session to refund.");
+  }
+  const session = await getStripe().checkout.sessions.retrieve(sessionId);
+  const paymentIntent = session.payment_intent;
+  const paymentIntentId =
+    typeof paymentIntent === "string" ? paymentIntent : paymentIntent?.id ?? null;
+  if (!paymentIntentId) {
+    throw new Error("Stripe has not recorded a payment for this checkout session yet.");
+  }
+  return getStripe().refunds.create({
+    payment_intent: paymentIntentId,
+    reason: "requested_by_customer",
+  });
+}

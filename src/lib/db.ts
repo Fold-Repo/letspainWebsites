@@ -3,7 +3,7 @@ import { hashPassword } from "./password";
 
 const globalForPg = globalThis as unknown as { pool?: Pool; ready?: Promise<void>; schemaVersion?: number };
 
-const schemaVersion = 11;
+const schemaVersion = 12;
 
 export function getPool() {
   const connectionString = process.env.DATABASE_URL;
@@ -182,6 +182,28 @@ CREATE TABLE IF NOT EXISTS site_settings (
   value TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_payment_status;
+ALTER TABLE bookings ADD CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'));
+
+CREATE TABLE IF NOT EXISTS refund_requests (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  booking_code TEXT NOT NULL REFERENCES bookings(code) ON DELETE CASCADE,
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  rejection_reason TEXT NOT NULL DEFAULT '',
+  stripe_refund_id TEXT,
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ,
+  resolved_by TEXT,
+  CONSTRAINT refund_requests_status CHECK (status IN ('pending', 'approved', 'rejected'))
+);
+
+CREATE INDEX IF NOT EXISTS refund_requests_status_idx ON refund_requests (status, requested_at DESC);
+CREATE INDEX IF NOT EXISTS refund_requests_booking_idx ON refund_requests (booking_code, requested_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS refund_requests_one_pending_idx
+  ON refund_requests (booking_code)
+  WHERE status = 'pending';
 `;
 
 /**

@@ -5,6 +5,14 @@ import type { Booking } from "./bookings";
 import { supportEmail } from "./event";
 import { getEvent, type Hangout } from "./events";
 import { paymentEmailHtml, paymentEmailText, receiptEmailHtml, receiptEmailText } from "./payment-email";
+import {
+  refundProcessingHtml,
+  refundProcessingText,
+  refundRejectedHtml,
+  refundRejectedText,
+  refundRequestedHtml,
+  refundRequestedText,
+} from "./refund-email";
 import { organiserEmailText, ticketEmailHtml, ticketEmailText } from "./ticket-email";
 import { ticketQrPng } from "./ticket";
 
@@ -153,6 +161,63 @@ export async function sendPaymentReceipt(booking: Booking): Promise<EmailResult>
       html,
     },
     `${booking.code}-receipt`,
+    html,
+    text,
+  );
+}
+
+export async function sendRefundRequestedEmail(booking: Booking, reason: string): Promise<EmailResult> {
+  const hangout = await hangoutFor(booking);
+  const html = refundRequestedHtml(booking, hangout, reason);
+  const text = refundRequestedText(booking, hangout, reason);
+  return deliver(
+    {
+      from: mailFrom(),
+      to: booking.email,
+      replyTo: supportEmail(),
+      subject: `Refund request received · ${booking.code}`,
+      text,
+      html,
+    },
+    `${booking.code}-refund-requested`,
+    html,
+    text,
+  );
+}
+
+export async function sendRefundProcessingEmail(booking: Booking): Promise<EmailResult> {
+  const hangout = await hangoutFor(booking);
+  const html = refundProcessingHtml(booking, hangout);
+  const text = refundProcessingText(booking, hangout);
+  return deliver(
+    {
+      from: mailFrom(),
+      to: booking.email,
+      replyTo: supportEmail(),
+      subject: `Refund approved · ${booking.code}`,
+      text,
+      html,
+    },
+    `${booking.code}-refund-processing`,
+    html,
+    text,
+  );
+}
+
+export async function sendRefundRejectedEmail(booking: Booking, reason: string): Promise<EmailResult> {
+  const hangout = await hangoutFor(booking);
+  const html = refundRejectedHtml(booking, hangout, reason);
+  const text = refundRejectedText(booking, hangout, reason);
+  return deliver(
+    {
+      from: mailFrom(),
+      to: booking.email,
+      replyTo: supportEmail(),
+      subject: `Refund request update · ${booking.code}`,
+      text,
+      html,
+    },
+    `${booking.code}-refund-rejected`,
     html,
     text,
   );

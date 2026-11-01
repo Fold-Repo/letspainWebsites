@@ -25,7 +25,7 @@ export type Booking = {
   marketingOptIn: boolean;
   createdAt: string;
   emailStatus: "pending" | "sent" | "unconfigured" | "failed";
-  paymentStatus: "unpaid" | "link_sent" | "paid" | "free";
+  paymentStatus: "unpaid" | "link_sent" | "paid" | "free" | "refunded";
   pricingChoice: PricingChoice;
   amountPence: number | null;
   currency: string;

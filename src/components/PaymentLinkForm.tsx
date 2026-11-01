@@ -13,6 +13,7 @@ export function PaymentLinkForm({
   seats,
   pricingChoice,
   cartTotalPence,
+  refunded = false,
 }: {
   code: string;
   paid: boolean;
@@ -22,6 +23,7 @@ export function PaymentLinkForm({
   seats: number;
   pricingChoice: "per_person" | "family" | "custom";
   cartTotalPence: number | null;
+  refunded?: boolean;
 }) {
   const router = useRouter();
   const hasCart = cartTotalPence != null && cartTotalPence > 0;
@@ -33,6 +35,7 @@ export function PaymentLinkForm({
   const [message, setMessage] = useState("");
   const [url, setUrl] = useState("");
 
+  if (refunded) return <p className="text-sm text-ink/70">Refunded</p>;
   if (paid) return <p className="text-sm text-burgundy">Paid</p>;
   if (isFree) return <p className="text-sm text-ink/70">Free event. No payment link.</p>;
 

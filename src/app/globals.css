@@ -512,6 +512,16 @@ select.field {
   color: var(--color-burgundy);
 }
 
+.admin-badge-refund {
+  background: color-mix(in srgb, #b45309 16%, white);
+  color: #9a3412;
+}
+
+.admin-badge-refunded {
+  background: color-mix(in srgb, var(--color-ink) 8%, white);
+  color: color-mix(in srgb, var(--color-ink) 70%, white);
+}
+
 .admin-table-wrap {
   overflow-x: auto;
 }

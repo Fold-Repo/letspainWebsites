@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { PaymentLinkForm } from "@/components/PaymentLinkForm";
+import {
+  ReservationsWithRefunds,
+  type RefundReviewItem,
+} from "@/components/ReservationsRefundControls";
 import { requirePageCapability } from "@/lib/admin-session";
-import { bookingCart, listBookings, partySize, type Booking } from "@/lib/bookings";
+import { bookingCart, guestName, listBookings, partySize, type Booking } from "@/lib/bookings";
 import { listEvents, type Hangout } from "@/lib/events";
 import { formatGbp } from "@/lib/money";
+import { listPendingRefunds } from "@/lib/refunds";
 
 export const dynamic = "force-dynamic";
 
-function statusLabel(booking: Booking) {
+function statusLabel(booking: Booking, hasPendingRefund: boolean) {
+  if (hasPendingRefund) return "Refund requested";
+  if (booking.paymentStatus === "refunded") return "Refunded";
   if (booking.checkedInAt) return "Checked in";
   if (booking.paymentStatus === "paid") return "Paid";
   if (booking.paymentStatus === "free") return "Free";
@@ -15,7 +22,9 @@ function statusLabel(booking: Booking) {
   return "Unpaid";
 }
 
-function statusBadge(booking: Booking) {
+function statusBadge(booking: Booking, hasPendingRefund: boolean) {
+  if (hasPendingRefund) return "admin-badge admin-badge-refund";
+  if (booking.paymentStatus === "refunded") return "admin-badge admin-badge-refunded";
   if (booking.checkedInAt) return "admin-badge admin-badge-in";
   if (booking.paymentStatus === "paid") return "admin-badge admin-badge-paid";
   if (booking.paymentStatus === "free") return "admin-badge admin-badge-free";
@@ -28,13 +37,19 @@ export default async function AdminReservationsPage() {
 
   let bookings: Booking[] = [];
   let events: Hangout[] = [];
+  let pendingRefunds: Awaited<ReturnType<typeof listPendingRefunds>> = [];
   let error = "";
   try {
-    [bookings, events] = await Promise.all([listBookings(), listEvents()]);
+    [bookings, events, pendingRefunds] = await Promise.all([
+      listBookings(),
+      listEvents(),
+      listPendingRefunds(),
+    ]);
   } catch {
     error = "Postgres is not reachable. Start the database, then refresh.";
   }
   const bySlug = new Map(events.map((hangout) => [hangout.slug, hangout]));
+  const bookingByCode = new Map(bookings.map((booking) => [booking.code, booking]));
   const carts = await Promise.all(
     bookings.map(async (booking) => {
       try {
@@ -56,6 +71,23 @@ export default async function AdminReservationsPage() {
   const paidRevenue = bookings
     .filter((booking) => booking.paymentStatus === "paid")
     .reduce((sum, booking) => sum + (booking.amountPence ?? 0), 0);
+
+  const pendingItems: RefundReviewItem[] = pendingRefunds.map((refund) => {
+    const booking = bookingByCode.get(refund.bookingCode);
+    const hangout = booking ? bySlug.get(booking.eventSlug) : undefined;
+    return {
+      id: refund.id,
+      bookingCode: refund.bookingCode,
+      reason: refund.reason,
+      requestedAt: refund.requestedAt,
+      guestName: booking ? guestName(booking) : refund.bookingCode,
+      email: booking?.email ?? "",
+      eventName: hangout?.name ?? booking?.eventSlug ?? "",
+      amountPence: booking?.amountPence ?? null,
+      checkedIn: Boolean(booking?.checkedInAt),
+      paymentStatus: booking?.paymentStatus ?? "unpaid",
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -116,92 +148,105 @@ export default async function AdminReservationsPage() {
 
       {error ? <p className="rounded-2xl bg-pink/40 px-4 py-3 text-sm">{error}</p> : null}
 
-      <section className="admin-card overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-burgundy/10 px-5 py-4">
-          <div>
-            <h3 className="text-base font-semibold text-ink">Recent enrolments</h3>
-            <p className="text-sm text-ink/50">Send payment links from the row actions.</p>
-          </div>
-        </div>
-        {!error && bookings.length === 0 ? (
-          <p className="px-5 py-10 text-sm text-ink/60">No enrolments yet.</p>
-        ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Guest</th>
-                  <th>Event</th>
-                  <th>Tickets</th>
-                  <th>Status</th>
-                  <th>Amount</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map((booking) => {
-                  const hangout = bySlug.get(booking.eventSlug);
-                  const cart = cartByCode.get(booking.code);
-                  return (
-                    <tr key={booking.code}>
-                      <td>
-                        <p className="font-semibold text-ink">
-                          {booking.firstName} {booking.lastName}
-                        </p>
-                        <p className="text-xs text-ink/50">{booking.email}</p>
-                        <p className="mt-1 text-[11px] tracking-wide text-burgundy/70 uppercase">{booking.code}</p>
-                      </td>
-                      <td>
-                        <p className="font-medium text-ink">{hangout?.name ?? booking.eventSlug}</p>
-                        <p className="text-xs text-ink/50">
-                          {booking.adults} adult{booking.adults === 1 ? "" : "s"}
-                          {booking.children > 0
-                            ? ` · ${booking.children} child${booking.children === 1 ? "" : "ren"}`
-                            : ""}
-                        </p>
-                      </td>
-                      <td>
-                        {cart && cart.items.length > 0 ? (
-                          <ul className="space-y-0.5 text-xs text-ink/70">
-                            {cart.items.map((item) => (
-                              <li key={item.id}>
-                                {item.quantity} × {item.categoryName}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-xs text-ink/45">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={statusBadge(booking)}>{statusLabel(booking)}</span>
-                        <p className="mt-1 text-[11px] text-ink/45">
-                          {new Date(booking.createdAt).toLocaleDateString("en-GB")}
-                        </p>
-                      </td>
-                      <td className="font-semibold text-ink">
-                        {booking.amountPence ? formatGbp(booking.amountPence) : "—"}
-                      </td>
-                      <td className="min-w-[14rem]">
-                        <PaymentLinkForm
-                          code={booking.code}
-                          paid={booking.paymentStatus === "paid"}
-                          isFree={hangout?.isFree ?? booking.paymentStatus === "free"}
-                          pricePence={hangout?.pricePence ?? null}
-                          familyPricePence={hangout?.familyPricePence ?? null}
-                          seats={partySize(booking)}
-                          pricingChoice={booking.pricingChoice}
-                          cartTotalPence={cart?.total ?? booking.amountPence}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      <ReservationsWithRefunds pending={pendingItems}>
+        {({ PendingBanner, ReviewButton, hasPending }) => (
+          <>
+            {PendingBanner}
+
+            <section className="admin-card overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-burgundy/10 px-5 py-4">
+                <div>
+                  <h3 className="text-base font-semibold text-ink">Recent enrolments</h3>
+                  <p className="text-sm text-ink/50">Send payment links from the row actions. Review refunds when requested.</p>
+                </div>
+              </div>
+              {!error && bookings.length === 0 ? (
+                <p className="px-5 py-10 text-sm text-ink/60">No enrolments yet.</p>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Guest</th>
+                        <th>Event</th>
+                        <th>Tickets</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bookings.map((booking) => {
+                        const hangout = bySlug.get(booking.eventSlug);
+                        const cart = cartByCode.get(booking.code);
+                        const pendingRefund = hasPending(booking.code);
+                        return (
+                          <tr key={booking.code}>
+                            <td>
+                              <p className="font-semibold text-ink">
+                                {booking.firstName} {booking.lastName}
+                              </p>
+                              <p className="text-xs text-ink/50">{booking.email}</p>
+                              <p className="mt-1 text-[11px] tracking-wide text-burgundy/70 uppercase">{booking.code}</p>
+                            </td>
+                            <td>
+                              <p className="font-medium text-ink">{hangout?.name ?? booking.eventSlug}</p>
+                              <p className="text-xs text-ink/50">
+                                {booking.adults} adult{booking.adults === 1 ? "" : "s"}
+                                {booking.children > 0
+                                  ? ` · ${booking.children} child${booking.children === 1 ? "" : "ren"}`
+                                  : ""}
+                              </p>
+                            </td>
+                            <td>
+                              {cart && cart.items.length > 0 ? (
+                                <ul className="space-y-0.5 text-xs text-ink/70">
+                                  {cart.items.map((item) => (
+                                    <li key={item.id}>
+                                      {item.quantity} × {item.categoryName}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <span className="text-xs text-ink/45">—</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className={statusBadge(booking, pendingRefund)}>
+                                {statusLabel(booking, pendingRefund)}
+                              </span>
+                              <p className="mt-1 text-[11px] text-ink/45">
+                                {new Date(booking.createdAt).toLocaleDateString("en-GB")}
+                              </p>
+                              <ReviewButton code={booking.code} />
+                            </td>
+                            <td className="font-semibold text-ink">
+                              {booking.amountPence ? formatGbp(booking.amountPence) : "—"}
+                            </td>
+                            <td className="min-w-[14rem]">
+                              <PaymentLinkForm
+                                code={booking.code}
+                                paid={booking.paymentStatus === "paid" || booking.paymentStatus === "refunded"}
+                                isFree={hangout?.isFree ?? booking.paymentStatus === "free"}
+                                pricePence={hangout?.pricePence ?? null}
+                                familyPricePence={hangout?.familyPricePence ?? null}
+                                seats={partySize(booking)}
+                                pricingChoice={booking.pricingChoice}
+                                cartTotalPence={cart?.total ?? booking.amountPence}
+                                refunded={booking.paymentStatus === "refunded"}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
         )}
-      </section>
+      </ReservationsWithRefunds>
 
       <section className="admin-banner flex flex-wrap items-center justify-between gap-4">
         <div>

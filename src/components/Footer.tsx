@@ -76,6 +76,9 @@ export function Footer({ social }: { social: FooterSocialLinks }) {
               <Link href="/partnerships">Partner</Link>
             </li>
             <li>
+              <Link href="/refund">Request a refund</Link>
+            </li>
+            <li>
               <Link href="/privacy">Privacy &amp; cookies</Link>
             </li>
           </ul>
