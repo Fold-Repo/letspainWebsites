@@ -103,3 +103,78 @@ export async function refundCheckoutSession(sessionId: string) {
     reason: "requested_by_customer",
   });
 }
+
+export type CheckoutRefundProbe = {
+  paymentIntentId: string | null;
+  amountTotal: number | null;
+  amountRefunded: number;
+  fullyRefunded: boolean;
+  hasSucceededRefund: boolean;
+  latestRefundId: string | null;
+  latestRefundStatus: string | null;
+};
+
+/** Read Stripe for a Checkout session and report whether the payment was refunded. */
+export async function probeCheckoutRefundStatus(sessionId: string): Promise<CheckoutRefundProbe | null> {
+  if (!stripeConfigured() || !sessionId.startsWith("cs_")) return null;
+  try {
+    const session = await getStripe().checkout.sessions.retrieve(sessionId, {
+      expand: ["payment_intent"],
+    });
+    const paymentIntent =
+      typeof session.payment_intent === "object" && session.payment_intent
+        ? session.payment_intent
+        : null;
+    const paymentIntentId =
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : paymentIntent?.id ?? null;
+
+    let amountRefunded = 0;
+    let latestRefundId: string | null = null;
+    let latestRefundStatus: string | null = null;
+    let hasSucceededRefund = false;
+
+    if (paymentIntentId) {
+      const refunds = await getStripe().refunds.list({
+        payment_intent: paymentIntentId,
+        limit: 20,
+      });
+      for (const refund of refunds.data) {
+        if (refund.status === "succeeded") {
+          hasSucceededRefund = true;
+          amountRefunded += refund.amount;
+        }
+        if (!latestRefundId) {
+          latestRefundId = refund.id;
+          latestRefundStatus = refund.status;
+        }
+      }
+    }
+    void paymentIntent;
+
+    const amountTotal =
+      typeof session.amount_total === "number"
+        ? session.amount_total
+        : paymentIntent && typeof paymentIntent.amount === "number"
+          ? paymentIntent.amount
+          : null;
+    const fullyRefunded =
+      hasSucceededRefund &&
+      amountTotal != null &&
+      amountTotal > 0 &&
+      amountRefunded >= amountTotal;
+
+    return {
+      paymentIntentId,
+      amountTotal,
+      amountRefunded,
+      fullyRefunded: fullyRefunded || (hasSucceededRefund && amountTotal == null),
+      hasSucceededRefund,
+      latestRefundId,
+      latestRefundStatus,
+    };
+  } catch {
+    return null;
+  }
+}

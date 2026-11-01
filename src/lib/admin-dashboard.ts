@@ -2,6 +2,7 @@ import { listBookings, partySize, type Booking } from "./bookings";
 import { listEvents } from "./events";
 import { listPartnerships } from "./partnerships";
 import { enrollmentState } from "./hangout";
+import { countRefundsByStatus, syncRefundsFromStripe } from "./refunds";
 
 export type DashboardDay = {
   date: string;
@@ -16,8 +17,17 @@ export type DashboardSummary = {
   seats: number;
   paid: number;
   unpaid: number;
+  refunded: number;
   checkedIn: number;
   paidRevenuePence: number;
+  refundedPence: number;
+  pendingRefundRequests: number;
+  approvedRefundRequests: number;
+  stripeRefundSync: {
+    checked: number;
+    updated: number;
+    pendingInStripe: number;
+  };
   eventsTotal: number;
   eventsPublished: number;
   eventsOpen: number;
@@ -63,19 +73,31 @@ function buildTrend(bookings: Booking[], days = 14): DashboardDay[] {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [bookings, events, partnerships] = await Promise.all([
+  // Re-check Stripe so approved / offline refunds land as payment_status = refunded.
+  const stripeRefundSync = await syncRefundsFromStripe(25).catch(() => ({
+    checked: 0,
+    updated: 0,
+    pendingInStripe: 0,
+  }));
+
+  const [bookings, events, partnerships, refundCounts] = await Promise.all([
     listBookings(),
     listEvents(),
     listPartnerships().catch(() => []),
+    countRefundsByStatus().catch(() => ({ pending: 0, approved: 0, rejected: 0 })),
   ]);
 
   const paid = bookings.filter((b) => b.paymentStatus === "paid").length;
   const unpaid = bookings.filter(
     (b) => b.paymentStatus === "unpaid" || b.paymentStatus === "link_sent",
   ).length;
+  const refunded = bookings.filter((b) => b.paymentStatus === "refunded").length;
   const checkedIn = bookings.filter((b) => b.checkedInAt).length;
   const paidRevenuePence = bookings
     .filter((b) => b.paymentStatus === "paid")
+    .reduce((sum, b) => sum + (b.amountPence ?? 0), 0);
+  const refundedPence = bookings
+    .filter((b) => b.paymentStatus === "refunded")
     .reduce((sum, b) => sum + (b.amountPence ?? 0), 0);
   const seats = bookings.reduce((sum, b) => sum + partySize(b), 0);
 
@@ -84,8 +106,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     seats,
     paid,
     unpaid,
+    refunded,
     checkedIn,
     paidRevenuePence,
+    refundedPence,
+    pendingRefundRequests: refundCounts.pending,
+    approvedRefundRequests: refundCounts.approved,
+    stripeRefundSync,
     eventsTotal: events.length,
     eventsPublished: events.filter((e) => e.published).length,
     eventsOpen: events.filter((e) => enrollmentState(e) === "open").length,

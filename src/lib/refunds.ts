@@ -93,6 +93,32 @@ export async function listPendingRefunds() {
   return result.rows.map(mapRefund);
 }
 
+export async function listApprovedRefundsNeedingSync() {
+  const result = await query<RefundRow>(
+    `SELECT r.*
+     FROM refund_requests r
+     INNER JOIN bookings b ON b.code = r.booking_code
+     WHERE r.status = 'approved'
+       AND b.payment_status = 'paid'
+     ORDER BY r.resolved_at DESC NULLS LAST
+     LIMIT 40`,
+  );
+  return result.rows.map(mapRefund);
+}
+
+export async function countRefundsByStatus() {
+  const result = await query<{ status: RefundStatus; count: number }>(
+    `SELECT status, COUNT(*)::int AS count
+     FROM refund_requests
+     GROUP BY status`,
+  );
+  const counts = { pending: 0, approved: 0, rejected: 0 };
+  for (const row of result.rows) {
+    if (row.status in counts) counts[row.status] = row.count;
+  }
+  return counts;
+}
+
 export async function listRefundsByBookingCodes(codes: string[]) {
   if (codes.length === 0) return [] as RefundRequest[];
   const result = await query<RefundRow>(
@@ -210,6 +236,85 @@ export async function markBookingRefunded(code: string) {
     [code],
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Ask Stripe whether paid bookings (especially approved refunds) have finished refunding,
+ * then flip local payment_status to refunded when the charge is fully refunded.
+ */
+export async function syncRefundsFromStripe(limit = 25): Promise<{
+  checked: number;
+  updated: number;
+  pendingInStripe: number;
+}> {
+  const { listBookings } = await import("./bookings");
+  const { probeCheckoutRefundStatus, stripeConfigured } = await import("./stripe");
+
+  if (!stripeConfigured()) {
+    return { checked: 0, updated: 0, pendingInStripe: 0 };
+  }
+
+  const [approvedNeedingSync, bookings] = await Promise.all([
+    listApprovedRefundsNeedingSync().catch(() => []),
+    listBookings(),
+  ]);
+  const bookingByCode = new Map(bookings.map((booking) => [booking.code, booking]));
+
+  const byCode = new Map<string, { code: string; stripeSessionId: string; refundId?: number }>();
+
+  // Prefer bookings with an approved refund that still show as paid.
+  for (const refund of approvedNeedingSync) {
+    const booking = bookingByCode.get(refund.bookingCode);
+    if (booking?.paymentStatus === "paid" && booking.stripeSessionId) {
+      byCode.set(booking.code, {
+        code: booking.code,
+        stripeSessionId: booking.stripeSessionId,
+        refundId: refund.id,
+      });
+    }
+  }
+
+  // Also spot-check other recent paid sessions (covers refunds done in Stripe Dashboard).
+  for (const booking of bookings) {
+    if (byCode.size >= limit) break;
+    if (booking.paymentStatus !== "paid" || !booking.stripeSessionId) continue;
+    if (byCode.has(booking.code)) continue;
+    byCode.set(booking.code, {
+      code: booking.code,
+      stripeSessionId: booking.stripeSessionId,
+    });
+  }
+
+  let checked = 0;
+  let updated = 0;
+  let pendingInStripe = 0;
+
+  for (const item of Array.from(byCode.values()).slice(0, limit)) {
+    checked += 1;
+    const probe = await probeCheckoutRefundStatus(item.stripeSessionId);
+    if (!probe) continue;
+
+    if (probe.latestRefundStatus === "pending" || probe.latestRefundStatus === "requires_action") {
+      pendingInStripe += 1;
+    }
+
+    if (!probe.fullyRefunded && !probe.hasSucceededRefund) continue;
+
+    const changed = await markBookingRefunded(item.code);
+    if (changed) {
+      updated += 1;
+      if (item.refundId && probe.latestRefundId) {
+        await query(
+          `UPDATE refund_requests
+           SET stripe_refund_id = COALESCE(stripe_refund_id, $2)
+           WHERE id = $1`,
+          [item.refundId, probe.latestRefundId],
+        ).catch(() => undefined);
+      }
+    }
+  }
+
+  return { checked, updated, pendingInStripe };
 }
 
 export async function approveRefundRequest(

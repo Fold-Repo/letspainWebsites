@@ -7,6 +7,7 @@ import { formatGbp } from "@/lib/money";
 export const dynamic = "force-dynamic";
 
 function statusLabel(status: string, checkedIn: boolean) {
+  if (status === "refunded") return "Refunded";
   if (checkedIn) return "Checked in";
   if (status === "paid") return "Paid";
   if (status === "free") return "Free";
@@ -15,6 +16,7 @@ function statusLabel(status: string, checkedIn: boolean) {
 }
 
 function statusBadge(status: string, checkedIn: boolean) {
+  if (status === "refunded") return "admin-badge admin-badge-refunded";
   if (checkedIn) return "admin-badge admin-badge-in";
   if (status === "paid") return "admin-badge admin-badge-paid";
   if (status === "free") return "admin-badge admin-badge-free";
@@ -48,6 +50,25 @@ export default async function AdminDashboardPage() {
           hint: `${summary.paid} paid booking${summary.paid === 1 ? "" : "s"}`,
           icon: "£",
           tone: "bg-[color-mix(in_srgb,#1f7a4d_14%,white)] text-[#1f7a4d]",
+        },
+        {
+          label: "Refunded",
+          value: String(summary.refunded),
+          hint: summary.refundedPence
+            ? `${formatGbp(summary.refundedPence)} returned · Stripe re-checked on load`
+            : "Stripe re-checked on each dashboard load",
+          icon: "↩",
+          tone: "bg-[color-mix(in_srgb,var(--color-ink)_8%,white)] text-ink/70",
+        },
+        {
+          label: "Refund requests",
+          value: String(summary.pendingRefundRequests),
+          hint:
+            summary.pendingRefundRequests > 0
+              ? "Waiting for approve / reject on Reservations"
+              : `${summary.approvedRefundRequests} approved to date`,
+          icon: "↺",
+          tone: "bg-pink/35 text-burgundy",
         },
         {
           label: "Awaiting payment",
@@ -87,7 +108,9 @@ export default async function AdminDashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="admin-page-title">Dashboard</h2>
-          <p className="mt-1 text-sm text-ink/55">A quick look at enrolments, revenue, and what’s open.</p>
+          <p className="mt-1 text-sm text-ink/55">
+            Enrolments, revenue, and Stripe refund status after paid bookings.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/reservations" className="admin-chip">
@@ -101,9 +124,25 @@ export default async function AdminDashboardPage() {
 
       {error ? <p className="rounded-2xl bg-pink/40 px-4 py-3 text-sm">{error}</p> : null}
 
+      {summary?.stripeRefundSync.updated ? (
+        <p className="rounded-2xl bg-[color-mix(in_srgb,#1f7a4d_12%,white)] px-4 py-3 text-sm text-[#1f7a4d]">
+          Synced {summary.stripeRefundSync.updated} booking
+          {summary.stripeRefundSync.updated === 1 ? "" : "s"} to <strong>Refunded</strong> after
+          confirming the Stripe refund completed.
+        </p>
+      ) : null}
+
+      {summary?.stripeRefundSync.pendingInStripe ? (
+        <p className="rounded-2xl bg-gold/25 px-4 py-3 text-sm text-[#8a5a12]">
+          {summary.stripeRefundSync.pendingInStripe} Stripe refund
+          {summary.stripeRefundSync.pendingInStripe === 1 ? " is" : "s are"} still processing.
+          Refresh the dashboard shortly to update status after paid → refunded.
+        </p>
+      ) : null}
+
       {summary ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
               <article key={metric.label} className="admin-card admin-metric">
                 <div className="flex items-start justify-between">
@@ -127,7 +166,9 @@ export default async function AdminDashboardPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-burgundy/10 px-5 py-4">
                 <div>
                   <h3 className="text-base font-semibold text-ink">Latest enrolments</h3>
-                  <p className="text-sm text-ink/50">Most recent bookings across hangouts.</p>
+                  <p className="text-sm text-ink/50">
+                    Status includes Paid and Refunded after Stripe confirmation.
+                  </p>
                 </div>
                 <Link href="/admin/reservations" className="text-sm font-semibold text-burgundy">
                   View all →
@@ -138,7 +179,10 @@ export default async function AdminDashboardPage() {
               ) : (
                 <ul className="divide-y divide-burgundy/8">
                   {summary.recent.map((booking) => (
-                    <li key={booking.code} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                    <li
+                      key={booking.code}
+                      className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5"
+                    >
                       <div className="min-w-0">
                         <p className="font-semibold text-ink">
                           {booking.firstName} {booking.lastName}
@@ -148,7 +192,12 @@ export default async function AdminDashboardPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className={statusBadge(booking.paymentStatus, Boolean(booking.checkedInAt))}>
+                        <span
+                          className={statusBadge(
+                            booking.paymentStatus,
+                            Boolean(booking.checkedInAt),
+                          )}
+                        >
                           {statusLabel(booking.paymentStatus, Boolean(booking.checkedInAt))}
                         </span>
                         <p className="mt-1 text-[11px] text-ink/45">
@@ -166,12 +215,20 @@ export default async function AdminDashboardPage() {
               <p className="mt-1 text-sm text-ink/50">Jump into the work that needs attention.</p>
               <ul className="mt-5 space-y-2">
                 {[
+                  {
+                    href: "/admin/reservations",
+                    label: "Review refunds",
+                    hint:
+                      summary.pendingRefundRequests > 0
+                        ? `${summary.pendingRefundRequests} waiting`
+                        : "Approve or reject requests",
+                  },
                   { href: "/admin/events/new", label: "Create hangout", hint: "New event wizard" },
                   { href: "/admin/reservations", label: "Manage payments", hint: "Send Stripe links" },
                   { href: "/admin/check-in", label: "Door check-in", hint: "Scan or enter codes" },
                   { href: "/admin/users", label: "Team users", hint: "Roles and access" },
                 ].map((item) => (
-                  <li key={item.href}>
+                  <li key={`${item.href}-${item.label}`}>
                     <Link
                       href={item.href}
                       className="flex items-center justify-between gap-3 rounded-xl border border-burgundy/10 bg-cream/50 px-4 py-3 transition hover:border-burgundy/25 hover:bg-white"
