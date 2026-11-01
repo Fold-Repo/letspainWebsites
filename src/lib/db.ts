@@ -3,7 +3,7 @@ import { hashPassword } from "./password";
 
 const globalForPg = globalThis as unknown as { pool?: Pool; ready?: Promise<void>; schemaVersion?: number };
 
-const schemaVersion = 13;
+const schemaVersion = 14;
 
 export function getPool() {
   const connectionString = process.env.DATABASE_URL;
@@ -57,10 +57,6 @@ CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pricing_choice TEXT NOT NULL DEFAULT 'per_person';
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_pricing_choice;
 ALTER TABLE bookings ADD CONSTRAINT bookings_pricing_choice CHECK (pricing_choice IN ('per_person', 'family', 'custom'));
--- Must include every live payment_status value (including refunded) or ADD CONSTRAINT fails
--- when refunded rows already exist and blocks ensureDatabase / health forever.
-ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_payment_status;
-ALTER TABLE bookings ADD CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'));
 
 CREATE TABLE IF NOT EXISTS events (
   slug TEXT PRIMARY KEY,
@@ -236,8 +232,36 @@ async function syncAdmin() {
   }
 }
 
+/**
+ * Drop/recreate payment_status check after sanitizing rows.
+ * Kept out of the big schema string so a violated-row error cannot abort
+ * the rest of ensureDatabase (which takes down /api/health and deploys).
+ */
+async function repairPaymentStatusConstraint() {
+  const pool = getPool();
+  await pool.query(`
+    UPDATE bookings
+    SET payment_status = 'unpaid'
+    WHERE payment_status IS NULL
+       OR btrim(payment_status) = ''
+       OR payment_status NOT IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded')
+  `);
+  await pool.query(`ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_payment_status`);
+  try {
+    await pool.query(`
+      ALTER TABLE bookings
+      ADD CONSTRAINT bookings_payment_status
+      CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'))
+    `);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/already exists/i.test(message)) throw error;
+  }
+}
+
 export async function ensureDatabase() {
   await getPool().query(schema);
+  await repairPaymentStatusConstraint();
   await syncAdmin();
   const { seedFeaturedEvent } = await import("./events");
   await seedFeaturedEvent();
