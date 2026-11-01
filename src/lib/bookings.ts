@@ -407,6 +407,27 @@ export async function checkInBooking(code: string, adminEmail: string) {
   return mapBooking(result.rows[0]);
 }
 
+export async function undoCheckInBooking(code: string) {
+  const booking = await getBooking(code);
+  if (!booking) {
+    throw new BookingError("That ticket was not found.", 404);
+  }
+  if (!booking.checkedInAt) {
+    throw new BookingError("This ticket is not checked in.", 409);
+  }
+  const result = await query<BookingRow>(
+    `UPDATE bookings
+     SET checked_in_at = NULL, checked_in_by = NULL
+     WHERE code = $1 AND checked_in_at IS NOT NULL
+     RETURNING *`,
+    [booking.code],
+  );
+  if (!result.rows[0]) {
+    throw new BookingError("Could not clear check-in. Refresh and try again.", 409);
+  }
+  return mapBooking(result.rows[0]);
+}
+
 export async function bookingCart(code: string) {
   return listBookingItems(code);
 }

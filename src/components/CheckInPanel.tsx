@@ -12,6 +12,7 @@ type Lookup = {
   children: number;
   paymentStatus: string;
   checkedInAt: string | null;
+  checkedInBy: string | null;
   amountPence: number | null;
   eventName: string;
   items: Array<{ name: string; quantity: number; seats: number }>;
@@ -22,12 +23,15 @@ export function CheckInPanel() {
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  /** True only right after a successful admit in this session — not a lookup of an old check-in. */
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
 
   async function findTicket(event: FormEvent) {
     event.preventDefault();
     setPending(true);
     setMessage("");
     setLookup(null);
+    setJustCheckedIn(false);
     try {
       const response = await fetch(`/api/admin/check-in?code=${encodeURIComponent(code.trim())}`);
       const data = (await response.json()) as { booking?: Lookup; message?: string };
@@ -37,6 +41,7 @@ export function CheckInPanel() {
         return;
       }
       setLookup(data.booking);
+      setJustCheckedIn(false);
     } catch {
       setMessage("Could not reach the server.");
     } finally {
@@ -54,11 +59,56 @@ export function CheckInPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: lookup.code }),
       });
-      const data = (await response.json()) as { message?: string; checkedInAt?: string };
-      setMessage(data.message ?? "Check-in updated.");
-      if (response.ok && data.checkedInAt) {
-        setLookup({ ...lookup, checkedInAt: data.checkedInAt });
+      const data = (await response.json()) as {
+        message?: string;
+        checkedInAt?: string;
+        checkedInBy?: string;
+      };
+      if (!response.ok) {
+        setMessage(data.message ?? "Check-in failed.");
+        // Refresh lookup so a race/double-tap shows the real checked-in time.
+        if (response.status === 409) {
+          const again = await fetch(`/api/admin/check-in?code=${encodeURIComponent(lookup.code)}`);
+          const againData = (await again.json()) as { booking?: Lookup };
+          if (againData.booking) {
+            setLookup(againData.booking);
+            setJustCheckedIn(false);
+          }
+        }
+        return;
       }
+      setMessage(data.message ?? "Checked in.");
+      setJustCheckedIn(true);
+      setLookup({
+        ...lookup,
+        checkedInAt: data.checkedInAt ?? new Date().toISOString(),
+        checkedInBy: data.checkedInBy ?? lookup.checkedInBy,
+      });
+    } catch {
+      setMessage("Could not reach the server.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function undoCheckIn() {
+    if (!lookup?.checkedInAt) return;
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/check-in", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lookup.code }),
+      });
+      const data = (await response.json()) as { message?: string; booking?: Lookup };
+      if (!response.ok) {
+        setMessage(data.message ?? "Could not undo check-in.");
+        return;
+      }
+      setJustCheckedIn(false);
+      setLookup(data.booking ?? { ...lookup, checkedInAt: null, checkedInBy: null });
+      setMessage(data.message ?? "Check-in cleared.");
     } catch {
       setMessage("Could not reach the server.");
     } finally {
@@ -93,13 +143,15 @@ export function CheckInPanel() {
         <article className="rounded-[1.4rem] bg-white p-5">
           <p className="text-xs tracking-[0.14em] text-burgundy uppercase">
             {lookup.code} · {lookup.paymentStatus}
-            {lookup.checkedInAt ? " · already in" : ""}
+            {lookup.checkedInAt ? (justCheckedIn ? " · checked in" : " · already in") : ""}
           </p>
           <h2 className="mt-2 font-display text-3xl">{lookup.guest}</h2>
           <p className="mt-1 text-sm text-ink/80">{lookup.eventName}</p>
           <p className="mt-2 text-sm">
             {lookup.adults} adult{lookup.adults === 1 ? "" : "s"}
-            {lookup.children > 0 ? `, ${lookup.children} child${lookup.children === 1 ? "" : "ren"}` : ""}
+            {lookup.children > 0
+              ? `, ${lookup.children} child${lookup.children === 1 ? "" : "ren"}`
+              : ""}
             {lookup.amountPence != null ? ` · ${formatGbp(lookup.amountPence)}` : ""}
           </p>
           {lookup.items.length > 0 ? (
@@ -116,11 +168,42 @@ export function CheckInPanel() {
               {lookup.email}
             </a>
           </p>
-          {lookup.checkedInAt ? (
-            <p className="mt-4 rounded-2xl bg-pink/40 px-4 py-3 text-sm">
-              Already checked in at {new Date(lookup.checkedInAt).toLocaleString("en-GB")}. Duplicate admission is
-              blocked.
-            </p>
+
+          {lookup.checkedInAt && justCheckedIn ? (
+            <div className="mt-4 space-y-3">
+              <p className="rounded-2xl bg-[color-mix(in_srgb,#1f7a4d_14%,white)] px-4 py-3 text-sm text-[#1f7a4d]">
+                Checked in successfully at {new Date(lookup.checkedInAt).toLocaleString("en-GB")}.
+                {lookup.checkedInBy ? ` · ${lookup.checkedInBy}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setCode("");
+                  setLookup(null);
+                  setJustCheckedIn(false);
+                  setMessage("");
+                }}
+                className="rounded-full bg-burgundy px-5 py-3 text-sm text-cream"
+              >
+                Next guest
+              </button>
+            </div>
+          ) : lookup.checkedInAt ? (
+            <div className="mt-4 space-y-3">
+              <p className="rounded-2xl bg-pink/40 px-4 py-3 text-sm">
+                Already checked in at {new Date(lookup.checkedInAt).toLocaleString("en-GB")}
+                {lookup.checkedInBy ? ` by ${lookup.checkedInBy}` : ""}. Duplicate admission is
+                blocked.
+              </p>
+              <button
+                type="button"
+                onClick={() => void undoCheckIn()}
+                disabled={pending}
+                className="rounded-full border border-burgundy/25 px-5 py-3 text-sm font-semibold text-burgundy disabled:opacity-60"
+              >
+                {pending ? "Working…" : "Undo check-in"}
+              </button>
+            </div>
           ) : lookup.paymentStatus === "paid" || lookup.paymentStatus === "free" ? (
             <button
               type="button"
