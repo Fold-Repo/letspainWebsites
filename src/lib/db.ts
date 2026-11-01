@@ -3,7 +3,7 @@ import { hashPassword } from "./password";
 
 const globalForPg = globalThis as unknown as { pool?: Pool; ready?: Promise<void>; schemaVersion?: number };
 
-const schemaVersion = 12;
+const schemaVersion = 13;
 
 export function getPool() {
   const connectionString = process.env.DATABASE_URL;
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   paid_at TIMESTAMPTZ,
   CONSTRAINT bookings_event_email UNIQUE (event_slug, email),
   CONSTRAINT bookings_email_status CHECK (email_status IN ('pending', 'sent', 'unconfigured', 'failed')),
-  CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid'))
+  CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'))
 );
 
 CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC);
@@ -57,8 +57,10 @@ CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pricing_choice TEXT NOT NULL DEFAULT 'per_person';
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_pricing_choice;
 ALTER TABLE bookings ADD CONSTRAINT bookings_pricing_choice CHECK (pricing_choice IN ('per_person', 'family', 'custom'));
+-- Must include every live payment_status value (including refunded) or ADD CONSTRAINT fails
+-- when refunded rows already exist and blocks ensureDatabase / health forever.
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_payment_status;
-ALTER TABLE bookings ADD CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free'));
+ALTER TABLE bookings ADD CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'));
 
 CREATE TABLE IF NOT EXISTS events (
   slug TEXT PRIMARY KEY,
@@ -182,9 +184,6 @@ CREATE TABLE IF NOT EXISTS site_settings (
   value TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_payment_status;
-ALTER TABLE bookings ADD CONSTRAINT bookings_payment_status CHECK (payment_status IN ('unpaid', 'link_sent', 'paid', 'free', 'refunded'));
 
 CREATE TABLE IF NOT EXISTS refund_requests (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
