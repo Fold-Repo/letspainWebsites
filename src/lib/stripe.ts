@@ -151,7 +151,6 @@ export async function probeCheckoutRefundStatus(sessionId: string): Promise<Chec
         }
       }
     }
-    void paymentIntent;
 
     const amountTotal =
       typeof session.amount_total === "number"
