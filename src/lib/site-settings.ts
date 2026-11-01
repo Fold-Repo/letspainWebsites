@@ -16,24 +16,40 @@ function normalizeUrl(value: string | null | undefined) {
   return trimmed;
 }
 
-export async function getSocialSettings(): Promise<SocialSettings> {
-  const result = await query<{ key: string; value: string }>(
-    `SELECT key, value FROM site_settings WHERE key = ANY($1::text[])`,
-    [[KEYS.instagram, KEYS.facebook]],
-  );
-  const map = new Map(result.rows.map((row) => [row.key, row.value]));
-
-  const fromDbInstagram = map.get(KEYS.instagram);
-  const fromDbFacebook = map.get(KEYS.facebook);
-
+function envFallback(): SocialSettings {
   return {
-    instagram: normalizeUrl(
-      fromDbInstagram !== undefined ? fromDbInstagram : process.env.SOCIAL_INSTAGRAM_URL,
-    ),
-    facebook: normalizeUrl(
-      fromDbFacebook !== undefined ? fromDbFacebook : process.env.SOCIAL_FACEBOOK_URL,
-    ),
+    instagram: normalizeUrl(process.env.SOCIAL_INSTAGRAM_URL),
+    facebook: normalizeUrl(process.env.SOCIAL_FACEBOOK_URL),
   };
+}
+
+export async function getSocialSettings(): Promise<SocialSettings> {
+  // Build/CI and offline prerender have no DB — keep layout renderable.
+  if (!process.env.DATABASE_URL) {
+    return envFallback();
+  }
+
+  try {
+    const result = await query<{ key: string; value: string }>(
+      `SELECT key, value FROM site_settings WHERE key = ANY($1::text[])`,
+      [[KEYS.instagram, KEYS.facebook]],
+    );
+    const map = new Map(result.rows.map((row) => [row.key, row.value]));
+
+    const fromDbInstagram = map.get(KEYS.instagram);
+    const fromDbFacebook = map.get(KEYS.facebook);
+
+    return {
+      instagram: normalizeUrl(
+        fromDbInstagram !== undefined ? fromDbInstagram : process.env.SOCIAL_INSTAGRAM_URL,
+      ),
+      facebook: normalizeUrl(
+        fromDbFacebook !== undefined ? fromDbFacebook : process.env.SOCIAL_FACEBOOK_URL,
+      ),
+    };
+  } catch {
+    return envFallback();
+  }
 }
 
 export async function saveSocialSettings(input: {
