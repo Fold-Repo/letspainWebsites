@@ -168,7 +168,7 @@ export function BookingForm({ events }: { events: BookableEvent[] }) {
       {event.tickets.length > 0 ? (
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium">Tickets</legend>
-          <p className="text-sm text-ink/70">{event.remainingSeats} places left.</p>
+          <p className="text-sm text-ink/70">Tickets are selling out fast.</p>
           {event.tickets.map((ticket) => {
             const quantity = qty[ticket.id] ?? 0;
             const max = Math.min(ticket.maxPerOrder, Math.floor(event.remainingSeats / ticket.seatsPerTicket) || 0);

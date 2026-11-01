@@ -31,16 +31,12 @@ export default async function EventPage({ params }: Params) {
   const story = storyParagraphs(hangout.story);
   const heroSrc = hasCustomCover(hangout) ? undefined : pickSceneBackground();
 
-  const enrolStatus = soldOut
-    ? "Sold out"
-    : open
-      ? `Open · ${remaining} place${remaining === 1 ? "" : "s"} left`
-      : "Enrolment closed";
+  const enrolStatus = soldOut ? "Sold out" : open ? "Open" : "Enrolment closed";
 
   const enrolDetail = soldOut
     ? "This hangout has no places left."
     : open
-      ? `Enrol until ${formatLondon(hangout.enrollmentEndsAt)}`
+      ? `Book until ${formatLondon(hangout.enrollmentEndsAt)}`
       : `Closed ${formatLondon(hangout.enrollmentEndsAt)}`;
 
   const payCopy = hangout.isFree
@@ -96,7 +92,10 @@ export default async function EventPage({ params }: Params) {
           {[
             { label: "When", value: whenLine || "Date to be confirmed" },
             { label: "Where", value: whereLine || "Venue to be confirmed" },
-            { label: "Places", value: soldOut ? "Sold out" : `${remaining} of ${hangout.capacity} left` },
+            {
+              label: "Tickets",
+              value: soldOut ? "Sold out" : "Tickets are selling out fast",
+            },
           ].map((fact, index) => (
             <div
               key={fact.label}
@@ -208,7 +207,7 @@ export default async function EventPage({ params }: Params) {
                   href="/book"
                   className="landing-btn mt-6 w-full justify-center bg-cream text-burgundy hover:bg-white sm:mt-7"
                 >
-                  Enrol now
+                  Buy Now
                   <span aria-hidden>→</span>
                 </Link>
               ) : (

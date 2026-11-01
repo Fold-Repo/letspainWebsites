@@ -598,7 +598,7 @@ export function EventForm({ mode, initial }: { mode: "create" | "edit"; initial:
                   onChange={() => setTiming("now")}
                   className="mt-1 accent-burgundy"
                 />
-                <span>Straight after enrolment</span>
+                <span>Straight after booking</span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <input

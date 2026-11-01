@@ -62,9 +62,7 @@ export default async function BookPage() {
                 <li>{first.venue}</li>
                 <li>{first.timeLabel}</li>
                 <li>Enrolment closes {formatLondon(first.enrollmentEndsAt)}</li>
-                <li>
-                  {first.soldOut ? "Sold out" : `${first.remainingSeats} place${first.remainingSeats === 1 ? "" : "s"} left`}
-                </li>
+                <li>{first.soldOut ? "Sold out" : "Tickets are selling out fast"}</li>
               </ul>
             ) : null}
           </>
